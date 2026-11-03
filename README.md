@@ -4,8 +4,8 @@ EventSphere is a modern, fully responsive event management website. You can expl
 
 > **K Explore – Web Designing Task:** Design and Develop a Responsive Event Management Website
 
-🔗 **Live Demo:** _add your deployed link here (GitHub Pages / Netlify / Vercel)_
-📂 **Repository:** _add your GitHub repo link here_
+🔗 **Live Demo:** https://govindtech-official.github.io/EventSphere/
+📂 **Repository:** https://github.com/govindtech-official/EventSphere
 
 ---
 
