@@ -6,7 +6,7 @@ It's built with **HTML5, CSS3 and vanilla JavaScript**, uses **Firebase** (Googl
 
 > **K Explore – Web Designing Task:** Design and Develop a Responsive Event Management Website
 
-🔗 **Live Demo:** https://govindtech-official.github.io/EventSphere/
+🔗 **Live Demo:** https://eveora.vercel.app/
 📂 **Repository:** https://github.com/govindtech-official/EventSphere
 
 ---
@@ -77,7 +77,7 @@ Google Sign-In is the only login method (official button + One Tap), linked to F
 - **JavaScript (ES6+)**: an IIFE, event delegation, `IntersectionObserver`, and Canvas image compression
 - **Firebase**: Authentication (Google) and Cloud Firestore with security rules, all on the free Spark plan
 - **Libraries**: [qrcodejs](https://github.com/davidshimjs/qrcodejs) for the UPI and ticket QR codes
-- **Git & GitHub** for version control, **GitHub Pages** for hosting
+- **Git & GitHub** for version control, **Vercel** for hosting (auto-deploys on every push)
 
 ## 📁 Project Structure
 ```
