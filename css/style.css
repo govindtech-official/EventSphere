@@ -484,6 +484,18 @@ h1, h2, h3 { line-height: 1.2; }
 
 .form-group input[readonly] { background: var(--bg-alt); cursor: not-allowed; color: var(--text-muted); }
 
+/* ---------- Legal pages (privacy / terms) ---------- */
+.legal { max-width: 780px; padding: 120px 0 60px; }
+.legal h1 { font-size: clamp(2rem, 5vw, 2.8rem); margin: .3rem 0 .4rem; }
+.legal .updated { color: var(--text-muted); font-size: .9rem; margin-bottom: 1.5rem; }
+.legal h2 { font-size: 1.25rem; margin: 2rem 0 .6rem; }
+.legal p, .legal li { color: var(--text-muted); }
+.legal ul { padding-left: 1.3rem; display: grid; gap: .4rem; }
+.legal strong { color: var(--text); }
+.legal a { color: var(--primary); text-decoration: underline; text-underline-offset: 3px; }
+.legal .legal-links { margin-top: 2.5rem; padding-top: 1.2rem; border-top: 1px solid var(--border); }
+.legal + .footer .copy { border-top: none; padding-top: 0; }
+
 /* ---------- Scroll reveal ---------- */
 .reveal { opacity: 0; transform: translateY(30px); transition: opacity .8s var(--ease), transform .8s var(--ease); }
 .reveal.visible { opacity: 1; transform: none; }

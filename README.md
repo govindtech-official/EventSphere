@@ -59,6 +59,8 @@ EventSphere is a modern, fully responsive event management website. You can expl
 ```
 EventSphere/
 ├── index.html        # Page structure: navbar, hero, featured, events, form, bookings, modals
+├── privacy.html      # Privacy policy (linked from the Google consent screen)
+├── terms.html        # Terms of service
 ├── css/
 │   └── style.css     # All styles: themes, components, animations, responsive breakpoints
 ├── js/
@@ -77,6 +79,8 @@ EventSphere/
 6. **Theme:** the `data-theme` attribute on `<html>` switches the CSS variables. A small inline script in `<head>` applies the saved theme before the page is drawn.
 
 ## 🔐 Google Sign-In setup (required for login)
+The live site is already configured. Follow these steps only if you fork the project and need your own Client ID.
+
 1. Open the [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials) and create or select a project.
 2. Set up the **OAuth consent screen**: choose External and add the app name and your email.
 3. Click **Create credentials → OAuth client ID** and choose the **Web application** type.

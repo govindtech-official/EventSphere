@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="EventSphere privacy policy – what data the site uses and where it is stored.">
+  <title>Privacy Policy – EventSphere</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('es-theme') ||
+          (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.setAttribute('data-theme', t);
+      } catch (e) {}
+    })();
+  </script>
+</head>
+<body>
+  <header class="navbar scrolled">
+    <div class="container nav-inner">
+      <a href="./" class="logo" aria-label="EventSphere home">
+        <span class="logo-icon">◉</span><span class="logo-text">Event<span>Sphere</span></span>
+      </a>
+      <a href="./" class="btn btn-outline">← Back to events</a>
+    </div>
+  </header>
+
+  <main class="legal container">
+    <span class="eyebrow">Legal</span>
+    <h1>Privacy Policy</h1>
+    <p class="updated">Last updated: 3 November 2026</p>
+
+    <p>EventSphere is a student web-design project that lets you browse sample events and register for them.
+      This policy explains what information the website uses and where it is kept.</p>
+
+    <h2>1. Information we use</h2>
+    <ul>
+      <li><strong>Google account details:</strong> when you choose <em>Sign in with Google</em>, Google shares your
+        name, email address and profile picture with the site. We only request these basic profile details.</li>
+      <li><strong>Registration details:</strong> the phone number, event and number of tickets you enter in the
+        registration form.</li>
+      <li><strong>Preferences:</strong> your light/dark theme choice.</li>
+    </ul>
+
+    <h2>2. Where your information is stored</h2>
+    <p>Everything is saved only in your own browser using <strong>Local Storage</strong>. EventSphere has no server
+      or database, and we do not send, sell or share your information with anyone.</p>
+
+    <h2>3. Third-party services</h2>
+    <p>The website loads a few resources from other services, which may receive standard technical information
+      (such as your IP address and browser type) when your browser requests them:</p>
+    <ul>
+      <li><strong>Google Identity Services</strong> – handles Sign in with Google
+        (<a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google Privacy Policy</a>).</li>
+      <li><strong>Google Fonts</strong> – provides the Poppins font.</li>
+      <li><strong>Unsplash</strong> – provides the event images.</li>
+      <li><strong>GitHub Pages</strong> – hosts the website.</li>
+    </ul>
+
+    <h2>4. Cookies</h2>
+    <p>EventSphere does not set its own cookies. Google may set cookies on its own domains to keep you signed in to
+      your Google account.</p>
+
+    <h2>5. Your choices</h2>
+    <ul>
+      <li>Sign out at any time from the profile menu.</li>
+      <li>Cancel any booking from <em>My Bookings</em>.</li>
+      <li>Delete all data by clearing this site's data in your browser settings.</li>
+      <li>Remove EventSphere's access to your Google account at
+        <a href="https://myaccount.google.com/connections" target="_blank" rel="noopener">myaccount.google.com/connections</a>.</li>
+    </ul>
+
+    <h2>6. Children</h2>
+    <p>EventSphere is not directed at children under 13.</p>
+
+    <h2>7. Changes and contact</h2>
+    <p>We may update this policy and will change the date above when we do. Questions? Open an issue on the
+      <a href="https://github.com/govindtech-official/EventSphere/issues" target="_blank" rel="noopener">GitHub repository</a>.</p>
+
+    <p class="legal-links"><a href="terms.html">Terms of Service</a> · <a href="./">Home</a></p>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <p class="copy">© 2026 EventSphere · Built with HTML, CSS &amp; JavaScript</p>
+    </div>
+  </footer>
+</body>
+</html>

@@ -11,5 +11,5 @@
    ========================================================= */
 
 window.ES_CONFIG = {
-  GOOGLE_CLIENT_ID: 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com'
+  GOOGLE_CLIENT_ID: '227222416582-c77rhsqi0n9fc4sk79inffm13e8fcg4e.apps.googleusercontent.com'
 };
