@@ -13,6 +13,7 @@
 
   const STORAGE_KEY = 'es-registrations';
   const THEME_KEY = 'es-theme';
+  const USER_KEY = 'es-user';
 
   const state = {
     category: 'All',
@@ -38,6 +39,11 @@
   };
 
   let registrations = store.get(STORAGE_KEY, []);
+  let currentUser = store.get(USER_KEY, null);
+
+  const myRegistrations = () => (currentUser
+    ? registrations.filter((r) => r.email === currentUser.email)
+    : []);
 
   /* ---------- Helpers ---------- */
   const escapeHTML = (str) => String(str).replace(/[&<>"']/g, (c) => (
@@ -85,6 +91,160 @@
       document.documentElement.setAttribute('data-theme', next);
       try { localStorage.setItem(THEME_KEY, next); } catch (e) { /* ignore */ }
       toast(next === 'dark' ? '🌙 Dark mode on' : '☀️ Light mode on');
+      renderGoogleButtons(); // match Google's button theme
+    });
+  }
+
+  /* ---------- Auth: Google Sign-In (the only login method) ---------- */
+  const GOOGLE_ICON = `<svg viewBox="0 0 48 48" aria-hidden="true">
+    <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+    <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+    <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+    <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+  </svg>`;
+
+  const clientId = () => (window.ES_CONFIG && window.ES_CONFIG.GOOGLE_CLIENT_ID) || '';
+  const isConfigured = () => /\.apps\.googleusercontent\.com$/.test(clientId()) && !clientId().startsWith('YOUR_');
+  const googleReady = () => !!(window.google && google.accounts && google.accounts.id);
+  let googleInitialised = false;
+
+  // Decode the payload of Google's ID token (JWT) – handles UTF-8 names
+  function decodeJwt(token) {
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const json = decodeURIComponent(atob(base64).split('')
+      .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+    return JSON.parse(json);
+  }
+
+  function handleCredential(response) {
+    try {
+      const p = decodeJwt(response.credential);
+      if (p.aud !== clientId() || p.exp * 1000 < Date.now()) throw new Error('Invalid token');
+      if (!p.email_verified) { toast('⚠️ Please use a verified Google account'); return; }
+      setUser({ name: p.name || p.email.split('@')[0], email: p.email.toLowerCase(), picture: p.picture || '', sub: p.sub });
+      toast(`👋 Welcome, ${currentUser.name.split(' ')[0]}!`);
+    } catch (e) {
+      toast('⚠️ Google sign-in failed. Please try again.');
+    }
+  }
+
+  function setUser(user) {
+    currentUser = user;
+    if (user) store.set(USER_KEY, user);
+    else { try { localStorage.removeItem(USER_KEY); } catch (e) { /* ignore */ } }
+    renderAuth();
+    refreshAll();
+  }
+
+  function signOut() {
+    if (googleReady()) google.accounts.id.disableAutoSelect();
+    setUser(null);
+    toast('Signed out');
+  }
+
+  const avatarHTML = (u) => {
+    const initial = escapeHTML((u.name || '?').trim().charAt(0).toUpperCase());
+    return u.picture
+      ? `<img src="${escapeHTML(u.picture)}" alt="" referrerpolicy="no-referrer" onerror="this.replaceWith(document.createTextNode('${initial}'))">`
+      : initial;
+  };
+
+  // Google's official button when available, otherwise a styled fallback
+  function renderGoogleButtons() {
+    $$('.g-btn-slot').forEach((slot) => {
+      const large = slot.dataset.size === 'large';
+      slot.innerHTML = '';
+      if (googleInitialised) {
+        const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+        const compact = !large && window.innerWidth < 600;
+        google.accounts.id.renderButton(slot, {
+          type: compact ? 'icon' : 'standard',
+          theme: dark ? 'filled_black' : 'outline',
+          size: large ? 'large' : 'medium',
+          shape: 'pill',
+          text: large ? 'signin_with' : 'signin',
+          logo_alignment: 'left',
+          width: large ? 260 : undefined
+        });
+      } else {
+        slot.innerHTML = `<button type="button" class="g-fallback ${large ? 'lg' : ''}">${GOOGLE_ICON}<span>${large ? 'Sign in with Google' : 'Sign in'}</span></button>`;
+      }
+    });
+  }
+
+  function renderAuth() {
+    const signedIn = !!currentUser;
+    $('#googleBtnNav').classList.toggle('hidden', signedIn);
+    $('#userMenu').classList.toggle('hidden', !signedIn);
+    $('#formShell').classList.toggle('locked', !signedIn);
+    $('#userDropdown').hidden = true;
+    $('#userChip').setAttribute('aria-expanded', 'false');
+
+    if (signedIn) {
+      $('#userAvatar').innerHTML = avatarHTML(currentUser);
+      $('#ddAvatar').innerHTML = avatarHTML(currentUser);
+      $('#userName').textContent = currentUser.name.split(' ')[0];
+      $('#ddName').textContent = currentUser.name;
+      $('#ddEmail').textContent = currentUser.email;
+    }
+    prefillUser();
+  }
+
+  // Name & email come from the Google account
+  function prefillUser() {
+    const f = $('#registerForm');
+    f.fullName.value = currentUser ? (f.fullName.value || currentUser.name) : '';
+    f.email.value = currentUser ? currentUser.email : '';
+  }
+
+  function initGoogle() {
+    if (googleInitialised || !isConfigured() || !googleReady()) return;
+    google.accounts.id.initialize({
+      client_id: clientId(),
+      callback: handleCredential,
+      auto_select: false,
+      cancel_on_tap_outside: true,
+      ux_mode: 'popup'
+    });
+    googleInitialised = true;
+    renderGoogleButtons();
+    if (!currentUser) google.accounts.id.prompt(); // One Tap
+  }
+
+  function initAuth() {
+    renderGoogleButtons();
+    renderAuth();
+
+    // Clicks on the fallback button (Google library not loaded / not configured)
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.g-fallback')) return;
+      if (!isConfigured()) toast('⚙️ Add your Google Client ID in js/config.js to enable sign-in');
+      else if (!googleReady()) toast('⏳ Google Sign-In is still loading…');
+      else { initGoogle(); google.accounts.id.prompt(); }
+    });
+
+    // Profile dropdown
+    const chip = $('#userChip');
+    const dd = $('#userDropdown');
+    chip.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dd.hidden = !dd.hidden;
+      chip.setAttribute('aria-expanded', String(!dd.hidden));
+    });
+    document.addEventListener('click', (e) => {
+      if (!dd.hidden && !e.target.closest('#userMenu')) { dd.hidden = true; chip.setAttribute('aria-expanded', 'false'); }
+    });
+    $$('a', dd).forEach((a) => a.addEventListener('click', () => { dd.hidden = true; }));
+    $('#signOutBtn').addEventListener('click', signOut);
+
+    // The Google library loads async – initialise whichever finishes last
+    if (googleReady()) initGoogle();
+    else window.onGoogleLibraryLoad = initGoogle;
+
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => { if (googleInitialised) renderGoogleButtons(); }, 300);
     });
   }
 
@@ -378,7 +538,7 @@
       v = v.trim();
       if (!v) return 'Please enter your full name.';
       if (v.length < 3) return 'Name must be at least 3 characters.';
-      if (!/^[A-Za-z][A-Za-z .'-]*$/.test(v)) return 'Name can only contain letters, spaces, dots and hyphens.';
+      if (!/^\p{L}[\p{L}\p{M} .'-]*$/u.test(v)) return 'Name can only contain letters, spaces, dots and hyphens.';
       return '';
     },
     email(v) {
@@ -477,6 +637,12 @@
 
     form.addEventListener('submit', (e) => {
       e.preventDefault();
+      if (!currentUser) {
+        toast('🔐 Please sign in with Google to register');
+        $('#register').scrollIntoView({ behavior: 'smooth' });
+        return;
+      }
+      form.email.value = currentUser.email;
       const allValid = fields.map(validateField).every(Boolean);
       if (!allValid) {
         const firstBad = $('.form-group.invalid input, .form-group.invalid select', form);
@@ -487,7 +653,8 @@
 
       const data = {
         name: form.fullName.value.trim(),
-        email: form.email.value.trim().toLowerCase(),
+        email: currentUser.email,
+        userId: currentUser.sub,
         phone: form.phone.value.replace(/[\s-]/g, '').replace(/^\+91/, ''),
         eventId: form.eventSelect.value,
         tickets: Number(form.tickets.value)
@@ -495,10 +662,10 @@
 
       // Prevent the same email registering twice for one event
       if (registrations.some((r) => r.eventId === data.eventId && r.email === data.email)) {
-        const group = form.email.closest('.form-group');
+        const group = form.eventSelect.closest('.form-group');
         group.classList.add('invalid');
-        $('.error-msg', group).textContent = 'This email is already registered for this event.';
-        form.email.focus();
+        $('.error-msg', group).textContent = 'You are already registered for this event.';
+        form.eventSelect.focus();
         return;
       }
 
@@ -517,6 +684,7 @@
         btn.disabled = false;
         form.reset();
         $$('.form-group', form).forEach((g) => g.classList.remove('valid', 'invalid'));
+        prefillUser();
         updateFormSummary();
         refreshAll();
         showSuccess(record, ev);
@@ -545,9 +713,21 @@
   /* ---------- My Bookings ---------- */
   function renderBookings() {
     const list = $('#bookingsList');
-    $('#bookingCount').textContent = registrations.length;
+    const mine = myRegistrations();
+    $('#bookingCount').textContent = mine.length;
 
-    if (!registrations.length) {
+    if (!currentUser) {
+      list.innerHTML = `
+        <div class="empty-state">
+          <div class="empty-icon">🔐</div>
+          <h3>Sign in to see your bookings</h3>
+          <p>Your registrations are linked to your Google account.</p>
+          <a href="#register" class="btn btn-outline">Sign in with Google</a>
+        </div>`;
+      return;
+    }
+
+    if (!mine.length) {
       list.innerHTML = `
         <div class="empty-state">
           <div class="empty-icon">🎟️</div>
@@ -558,7 +738,7 @@
       return;
     }
 
-    list.innerHTML = registrations.map((r, i) => {
+    list.innerHTML = mine.map((r, i) => {
       const ev = getEvent(r.eventId);
       if (!ev) return '';
       return `
@@ -643,6 +823,7 @@
     $('[data-count="8"]').dataset.count = new Set(EVENTS.map((e) => e.city)).size;
 
     initTheme();
+    initAuth();
     initNavbar();
     renderChips();
     renderHeroNext();

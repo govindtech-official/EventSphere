@@ -38,6 +38,25 @@
       </nav>
 
       <div class="nav-actions">
+        <!-- Auth: Google Sign-In only -->
+        <div class="auth" id="authArea">
+          <div class="g-btn-slot" id="googleBtnNav" data-size="nav"></div>
+          <div class="user-menu hidden" id="userMenu">
+            <button class="user-chip" id="userChip" aria-haspopup="true" aria-expanded="false">
+              <span class="avatar" id="userAvatar"></span>
+              <span class="user-name" id="userName"></span>
+              <span class="caret" aria-hidden="true">▾</span>
+            </button>
+            <div class="user-dropdown" id="userDropdown" hidden>
+              <div class="dd-head">
+                <span class="avatar avatar-lg" id="ddAvatar"></span>
+                <div><strong id="ddName"></strong><small id="ddEmail"></small></div>
+              </div>
+              <a href="#my-registrations" class="dd-item">🎟️ My Bookings</a>
+              <button class="dd-item" id="signOutBtn">↪ Sign out</button>
+            </div>
+          </div>
+        </div>
         <button class="icon-btn" id="themeToggle" aria-label="Toggle dark mode" title="Toggle theme">
           <span class="sun">☀️</span><span class="moon">🌙</span>
         </button>
@@ -138,9 +157,10 @@
         <div class="register-info reveal">
           <span class="eyebrow">Book your spot</span>
           <h2>Register for an Event</h2>
-          <p>Fill in your details and we'll reserve your seat instantly. Your bookings are saved on
-            this device so you can view or cancel them anytime.</p>
+          <p>Sign in with Google, pick your event and we'll reserve your seat instantly. Your bookings
+            are linked to your Google account so you can view or cancel them anytime.</p>
           <ul class="perks">
+            <li><span>🔑</span> One-tap sign in with Google</li>
             <li><span>⚡</span> Instant confirmation with ticket ID</li>
             <li><span>🔒</span> Your data stays in your browser</li>
             <li><span>↩️</span> Free cancellation from “My Bookings”</li>
@@ -148,7 +168,14 @@
           <div class="selected-preview" id="selectedPreview"></div>
         </div>
 
-        <form class="register-form reveal" id="registerForm" novalidate>
+        <div class="form-shell reveal" id="formShell">
+        <div class="auth-gate" id="authGate">
+          <div class="gate-icon">🔐</div>
+          <h3>Sign in to register</h3>
+          <p>Sign in with your Google account to book events. Your name and email are filled in for you.</p>
+          <div class="g-btn-slot" id="googleBtnGate" data-size="large"></div>
+        </div>
+        <form class="register-form" id="registerForm" novalidate>
           <div class="form-group">
             <label for="fullName">Full Name <span class="req">*</span></label>
             <input type="text" id="fullName" name="fullName" placeholder="e.g. Aarav Sharma" autocomplete="name">
@@ -158,7 +185,7 @@
           <div class="form-row">
             <div class="form-group">
               <label for="email">Email Address <span class="req">*</span></label>
-              <input type="email" id="email" name="email" placeholder="you@example.com" autocomplete="email">
+              <input type="email" id="email" name="email" placeholder="you@example.com" autocomplete="email" readonly title="Taken from your Google account">
               <small class="error-msg" aria-live="polite"></small>
             </div>
             <div class="form-group">
@@ -198,6 +225,7 @@
             <span class="spinner" aria-hidden="true"></span>
           </button>
         </form>
+        </div>
       </div>
     </section>
 
@@ -207,7 +235,7 @@
         <div class="section-head reveal">
           <span class="eyebrow">Saved locally</span>
           <h2>My Bookings</h2>
-          <p>All registrations made from this browser (stored with Local Storage).</p>
+          <p>Registrations for your Google account, saved in this browser with Local Storage.</p>
         </div>
         <div class="bookings-list" id="bookingsList"></div>
       </div>
@@ -252,6 +280,8 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
   <button class="back-to-top" id="backToTop" aria-label="Back to top">↑</button>
 
+  <script src="js/config.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="js/data.js"></script>
   <script src="js/app.js"></script>
 </body>

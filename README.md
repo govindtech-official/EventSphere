@@ -26,6 +26,11 @@ EventSphere is a modern, fully responsive event management website. You can expl
 | **Confirmation message** | A success modal with a generated **Ticket ID** and a booking summary |
 | **Responsive design** | Layouts for mobile, tablet and desktop, with a hamburger menu and a bottom-sheet modal on phones |
 
+### 🔑 Login with Google
+- **Google Sign-In is the only login method.** There are no passwords or other providers. It uses [Google Identity Services](https://developers.google.com/identity/gsi/web): the official button plus One Tap.
+- You have to sign in to register. Your **name and email are filled in from your Google account**, and the email can't be edited.
+- **My Bookings** only shows the registrations for the signed-in account. A profile menu in the navbar shows your avatar and has **Sign out**.
+
 ### 🏆 Bonus challenges (all implemented)
 - 🌙 **Dark / light mode**: the toggle is saved in Local Storage, follows the OS preference on first visit, and doesn't flash on load
 - ⏳ **Event countdown timers**: live days, hours, minutes and seconds in the hero card and in every event modal
@@ -57,6 +62,7 @@ EventSphere/
 ├── css/
 │   └── style.css     # All styles: themes, components, animations, responsive breakpoints
 ├── js/
+│   ├── config.js     # Google OAuth Client ID
 │   ├── data.js       # Event dataset (12 events) and category icons
 │   └── app.js        # Rendering, search/filter/sort, modals, countdowns, validation, storage
 └── README.md
@@ -70,11 +76,27 @@ EventSphere/
 5. **Storage:** a confirmed registration is saved to `localStorage` under the key `es-registrations`. Seats left are worked out as `total seats − booked tickets`, so cancelling a booking frees the seats.
 6. **Theme:** the `data-theme` attribute on `<html>` switches the CSS variables. A small inline script in `<head>` applies the saved theme before the page is drawn.
 
+## 🔐 Google Sign-In setup (required for login)
+1. Open the [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials) and create or select a project.
+2. Set up the **OAuth consent screen**: choose External and add the app name and your email.
+3. Click **Create credentials → OAuth client ID** and choose the **Web application** type.
+4. Under **Authorized JavaScript origins**, add every URL the site runs on (no paths), for example:
+   - `http://localhost`
+   - `http://localhost:5173`
+   - `https://<username>.github.io`
+5. Copy the Client ID into `js/config.js`:
+   ```js
+   window.ES_CONFIG = { GOOGLE_CLIENT_ID: '1234-abc.apps.googleusercontent.com' };
+   ```
+> Google Sign-In does **not** work from `file://`. Run the site from a local server (see below) or from your deployed URL.
+> The Client ID is public by design, so it's safe to commit. This is a front-end-only demo: the ID token is decoded in the browser, and the sign-in state is kept in Local Storage.
+
 ## 🚀 Run locally
 No installation needed. Just open `index.html` in a browser, or run a local server:
 ```bash
-npx serve .
+npx http-server -p 5173 .
 ```
+Then open http://localhost:5173.
 
 ## 🌐 Deployment
 **GitHub Pages**

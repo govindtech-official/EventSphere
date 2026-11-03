@@ -423,6 +423,67 @@ h1, h2, h3 { line-height: 1.2; }
 .footer-links a:hover { color: var(--primary); }
 .copy { grid-column: 1 / -1; text-align: center; padding-top: 1.5rem; border-top: 1px solid var(--border); }
 
+/* ---------- Auth (Google Sign-In) ---------- */
+.auth { display: flex; align-items: center; }
+.g-btn-slot { display: flex; justify-content: center; min-height: 32px; }
+.g-btn-slot:empty { display: none; }
+
+/* Styled fallback shown until (or if) Google's own button loads */
+.g-fallback {
+  display: inline-flex; align-items: center; gap: .6rem; padding: .5rem 1rem; border-radius: 999px;
+  background: #fff; color: #3c4043; border: 1px solid #dadce0; font-weight: 500; font-size: .9rem;
+  transition: box-shadow .2s, background .2s;
+}
+.g-fallback:hover { box-shadow: 0 2px 8px rgba(0, 0, 0, .15); background: #f8f9fa; }
+.g-fallback svg { width: 18px; height: 18px; flex-shrink: 0; }
+.g-fallback.lg { padding: .75rem 1.4rem; font-size: 1rem; }
+
+.user-menu { position: relative; }
+.user-chip {
+  display: flex; align-items: center; gap: .5rem; padding: 4px 12px 4px 4px; border-radius: 999px;
+  background: var(--surface); border: 1px solid var(--border); transition: box-shadow .2s;
+}
+.user-chip:hover { box-shadow: var(--shadow); }
+.user-name { font-weight: 500; font-size: .9rem; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.caret { font-size: .7rem; color: var(--text-muted); }
+
+.avatar {
+  width: 32px; height: 32px; border-radius: 50%; overflow: hidden; flex-shrink: 0; display: grid; place-items: center;
+  background: var(--gradient); color: #fff; font-weight: 700; font-size: .85rem;
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.avatar-lg { width: 44px; height: 44px; font-size: 1.1rem; }
+
+.user-dropdown {
+  position: absolute; top: calc(100% + 10px); right: 0; width: 250px; padding: .5rem; z-index: 110;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-lg);
+  animation: popIn .25s var(--ease);
+}
+.user-dropdown[hidden] { display: none; }
+.dd-head { display: flex; gap: .7rem; align-items: center; padding: .6rem; border-bottom: 1px solid var(--border); margin-bottom: .3rem; }
+.dd-head div { min-width: 0; }
+.dd-head strong, .dd-head small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dd-head small { color: var(--text-muted); font-size: .8rem; }
+.dd-item { display: block; width: 100%; text-align: left; padding: .6rem .8rem; border-radius: var(--radius-sm); font-size: .9rem; }
+.dd-item:hover { background: var(--bg-alt); }
+#signOutBtn:hover { color: var(--danger); }
+
+/* Registration lock when signed out */
+.form-shell { position: relative; }
+.auth-gate {
+  position: absolute; inset: 0; z-index: 5; display: none; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 2rem; border-radius: 22px;
+  background: color-mix(in srgb, var(--surface) 70%, transparent); backdrop-filter: blur(6px);
+}
+.form-shell.locked .auth-gate { display: flex; }
+.form-shell.locked .register-form { filter: blur(2px); pointer-events: none; user-select: none; }
+.gate-icon { font-size: 2.6rem; margin-bottom: .5rem; }
+.auth-gate h3 { font-size: 1.4rem; margin-bottom: .4rem; }
+.auth-gate p { color: var(--text-muted); max-width: 340px; margin-bottom: 1.2rem; }
+.auth-note { font-size: .8rem; color: var(--text-muted); margin-top: .8rem; }
+
+.form-group input[readonly] { background: var(--bg-alt); cursor: not-allowed; color: var(--text-muted); }
+
 /* ---------- Scroll reveal ---------- */
 .reveal { opacity: 0; transform: translateY(30px); transition: opacity .8s var(--ease), transform .8s var(--ease); }
 .reveal.visible { opacity: 1; transform: none; }
@@ -476,4 +537,9 @@ h1, h2, h3 { line-height: 1.2; }
   .footer .logo { justify-content: center; }
   .footer-links { justify-content: center; }
   .toolbar select { width: 100%; }
+  .user-name, .caret { display: none; }
+  .user-chip { padding: 3px; }
+  .g-fallback:not(.lg) span { display: none; }
+  .g-fallback:not(.lg) { padding: .55rem; }
+  .logo { font-size: 1.2rem; }
 }
