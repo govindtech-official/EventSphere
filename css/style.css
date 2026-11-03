@@ -382,7 +382,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; line-height
 .form-group > label:first-child, .form-group > label[for] { font-size: .68rem; font-weight: 600; letter-spacing: .2em; text-transform: uppercase; color: var(--text-muted); margin-bottom: .5rem; }
 .req { color: var(--accent); }
 
-.form-group input:not([type="checkbox"]):not([type="file"]), .form-group select, .confirm-body textarea, .add-admin input {
+.form-group input:not([type="checkbox"]):not([type="file"]), .form-group select, .form-group textarea, .confirm-body textarea, .add-admin input {
   width: 100%; padding: .85rem 1rem; border-radius: 2px; border: 1px solid var(--border); background: var(--bg);
   outline: none; transition: border-color .3s, box-shadow .3s, background .5s;
 }
@@ -511,6 +511,34 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; line-height
 .rc-meta { margin-top: .6rem; color: var(--text-muted); font-size: .76rem; letter-spacing: .02em; }
 .rc-actions { display: flex; align-items: center; gap: .6rem; margin-top: 1.1rem; flex-wrap: wrap; }
 .rc-actions .spacer { flex: 1; }
+
+.form-group textarea { resize: vertical; min-height: 84px; }
+.form-group input[type="datetime-local"] { color-scheme: light dark; }
+.form-group.invalid textarea { border-color: var(--danger); }
+
+/* Host an event – the organiser's own submissions */
+.my-events:empty { display: none; }
+.my-events { display: grid; gap: .7rem; }
+.my-events h4 { font-size: 1.3rem; margin-bottom: .2rem; }
+.my-event {
+  display: grid; grid-template-columns: 56px 1fr auto; gap: .9rem; align-items: center; padding: .7rem;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+}
+.my-event .img-wrap { width: 56px; height: 56px; border-radius: 4px; }
+.my-event .img-wrap .fallback { font-size: 1.5rem; }
+.my-event strong { display: block; font-family: var(--font-display); font-size: 1.1rem; }
+.my-event small { color: var(--text-muted); font-size: .78rem; }
+.my-event .reason { display: block; color: var(--danger); font-size: .76rem; margin-top: .15rem; }
+.my-event-actions { display: grid; gap: .35rem; justify-items: end; }
+
+/* Admin – event approvals */
+.admin-events { margin-top: 3.5rem; }
+.admin-events .am-head p a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }
+.event-review { display: grid; grid-template-columns: 160px 1fr; gap: 1.3rem; }
+.event-review .img-wrap { width: 160px; height: 120px; border-radius: var(--radius); }
+.event-review .img-wrap .fallback { font-size: 2.6rem; }
+.event-review .er-desc { color: var(--text-muted); font-size: .86rem; margin-top: .8rem; }
+.status-badge.published { color: var(--success); }
 
 .admin-manager { margin-top: 3rem; padding: 2rem; border: 1px solid var(--hairline); border-radius: var(--radius-lg); background: var(--surface); }
 .am-head h3 { font-size: 1.9rem; font-weight: 500; margin: .4rem 0 .2rem; }
@@ -778,6 +806,10 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; line-height
   .admin-stats { grid-template-columns: 1fr 1fr; }
   .rc-grid { grid-template-columns: 1fr; }
   .rc-head { flex-direction: column; }
+  .event-review { grid-template-columns: 1fr; }
+  .event-review .img-wrap { width: 100%; height: 160px; }
+  .my-event { grid-template-columns: 48px 1fr; }
+  .my-event-actions { grid-column: 1 / -1; justify-items: stretch; }
   .add-admin { flex-direction: column; }
   .admin-manager { padding: 1.4rem; }
   .footer-inner { grid-template-columns: 1fr; text-align: center; }

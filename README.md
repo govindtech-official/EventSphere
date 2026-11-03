@@ -39,6 +39,13 @@ Safeguards:
 
 > Until a real UPI ID is set in `js/config.js`, the payment step runs in **demo mode** and tells visitors not to send money.
 
+### 🗓️ Host an Event
+- **Admins and the superadmin** publish events directly from **Host an Event**. These go live immediately and can be featured on the home page.
+- **Any signed-in guest** can submit an event. It stays **Awaiting approval** and is visible only to the organiser and admins until an admin approves it.
+- Admins approve, reject (with a reason the organiser sees), unpublish or feature events in **Admin → Event Approvals**.
+- Published events appear alongside the built-in ones everywhere: search, filters, featured, booking and payment verification.
+- Organisers see the status of their submissions under the form and can withdraw them until they are live.
+
 ### 👑 Roles
 | Role | Can do |
 |---|---|

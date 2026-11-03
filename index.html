@@ -61,6 +61,7 @@
         <a href="#featured">Featured</a>
         <a href="#events">Events</a>
         <a href="#register">Reserve</a>
+        <a href="#host">Host</a>
         <a href="#my-registrations">My Bookings <span class="badge" id="bookingCount">0</span></a>
         <a href="#admin" id="adminNavLink" class="hidden">Admin <span class="badge" id="pendingCount">0</span></a>
       </nav>
@@ -299,6 +300,125 @@
       </div>
     </section>
 
+    <!-- ========== HOST AN EVENT ========== -->
+    <section class="section section-alt" id="host">
+      <div class="container register-wrap">
+        <div class="register-info reveal">
+          <span class="eyebrow">For Organisers</span>
+          <h2>Host an Event</h2>
+          <p id="hostIntro">Present your event to Eveora's guests. Every submission is reviewed by our team and goes live
+            once approved.</p>
+          <ol class="steps">
+            <li><span>I</span><div><strong>Share the details</strong><small>Date, venue, pricing and a cover image</small></div></li>
+            <li><span>II</span><div><strong>Curated review</strong><small>An Eveora admin checks every listing</small></div></li>
+            <li><span>III</span><div><strong>Go live</strong><small>Guests can discover and reserve</small></div></li>
+          </ol>
+          <div class="my-events" id="myEvents"></div>
+        </div>
+
+        <div class="form-shell reveal locked" id="hostShell">
+          <div class="auth-gate">
+            <svg class="ic gate-icon" aria-hidden="true"><use href="#i-lock"/></svg>
+            <h3>Sign in to host</h3>
+            <p>Use your Google account to submit an event for review.</p>
+            <div class="g-btn-slot" data-size="large"></div>
+          </div>
+
+          <form class="register-form" id="hostForm" novalidate>
+            <div class="form-group">
+              <label for="evName">Event name <span class="req">*</span></label>
+              <input type="text" id="evName" name="evName" maxlength="80" placeholder="e.g. Midnight Jazz Soirée">
+              <small class="error-msg" aria-live="polite"></small>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="evCategory">Category <span class="req">*</span></label>
+                <select id="evCategory" name="evCategory"></select>
+                <small class="error-msg" aria-live="polite"></small>
+              </div>
+              <div class="form-group">
+                <label for="evOrganizer">Hosted by <span class="req">*</span></label>
+                <input type="text" id="evOrganizer" name="evOrganizer" maxlength="80" placeholder="Organiser or company">
+                <small class="error-msg" aria-live="polite"></small>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="evDate">Date &amp; time <span class="req">*</span></label>
+                <input type="datetime-local" id="evDate" name="evDate">
+                <small class="error-msg" aria-live="polite"></small>
+              </div>
+              <div class="form-group">
+                <label for="evSeats">Seats <span class="req">*</span></label>
+                <input type="number" id="evSeats" name="evSeats" min="1" max="5000" placeholder="e.g. 150">
+                <small class="error-msg" aria-live="polite"></small>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="evVenue">Venue <span class="req">*</span></label>
+                <input type="text" id="evVenue" name="evVenue" maxlength="100" placeholder="e.g. The Taj Mahal Palace">
+                <small class="error-msg" aria-live="polite"></small>
+              </div>
+              <div class="form-group">
+                <label for="evCity">City <span class="req">*</span></label>
+                <input type="text" id="evCity" name="evCity" maxlength="50" placeholder="e.g. Mumbai">
+                <small class="error-msg" aria-live="polite"></small>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="evPrice">Price per guest (₹) <span class="req">*</span></label>
+              <input type="number" id="evPrice" name="evPrice" min="0" max="100000" placeholder="0 for complimentary">
+              <small class="error-msg" aria-live="polite"></small>
+            </div>
+
+            <div class="form-group">
+              <label for="evImage">Cover image</label>
+              <label class="upload-box" id="evImageBox">
+                <input type="file" id="evImage" name="evImage" accept="image/png,image/jpeg,image/webp">
+                <span class="upload-empty">
+                  <svg class="ic"><use href="#i-image"/></svg>
+                  <strong>Choose a cover image</strong> (optional)
+                  <small>JPG, PNG or WebP · landscape works best</small>
+                </span>
+                <span class="upload-busy"><span class="spinner"></span> Preparing image…</span>
+                <img id="evImagePreview" alt="Cover image preview" hidden>
+              </label>
+              <small class="error-msg" aria-live="polite"></small>
+            </div>
+
+            <div class="form-group">
+              <label for="evDescription">Description <span class="req">*</span></label>
+              <textarea id="evDescription" name="evDescription" rows="3" maxlength="600" placeholder="What makes this experience special?"></textarea>
+              <small class="error-msg" aria-live="polite"></small>
+            </div>
+
+            <div class="form-group">
+              <label for="evHighlights">Highlights</label>
+              <textarea id="evHighlights" name="evHighlights" rows="3" placeholder="One per line, up to 6"></textarea>
+              <small class="error-msg" aria-live="polite"></small>
+            </div>
+
+            <div class="form-group checkbox-group hidden" id="evFeaturedRow">
+              <label class="checkbox">
+                <input type="checkbox" id="evFeatured" name="evFeatured">
+                <span>Feature this event on the home page</span>
+              </label>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-block" id="hostSubmit">
+              <span class="btn-label">Submit for Approval</span>
+              <span class="spinner" aria-hidden="true"></span>
+            </button>
+          </form>
+        </div>
+      </div>
+    </section>
+
     <!-- ========== MY BOOKINGS ========== -->
     <section class="section section-alt" id="my-registrations">
       <div class="container">
@@ -332,6 +452,17 @@
         </div>
 
         <div class="review-list" id="reviewList"></div>
+
+        <div class="admin-events" id="adminEvents">
+          <div class="am-head">
+            <span class="eyebrow">Listings</span>
+            <h3>Event Approvals</h3>
+            <p>Events submitted by guests go live only after you approve them. Events you publish from
+              <a href="#host">Host an Event</a> go live immediately.</p>
+          </div>
+          <div class="chips" id="eventFilters"></div>
+          <div class="review-list" id="eventReviewList"></div>
+        </div>
 
         <div class="admin-manager hidden" id="adminManager">
           <div class="am-head">

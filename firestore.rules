@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// Eveora – Cloud Firestore security rules
+// Eveora - Cloud Firestore security rules
 // Roles: the superadmin (email below) adds/removes admins; admins verify
 // payments and issue tickets; attendees only see their own bookings.
 service cloud.firestore {
@@ -106,6 +106,47 @@ service cloud.firestore {
           && resource.data.uid == request.auth.uid
           && regAfter(resource.data.regId).status == 'cancelled');
       allow update: if false;
+    }
+
+    // ---------- Events: admins publish directly; everyone else needs approval ----------
+    match /events/{eventId} {
+      allow read: if resource.data.status == 'published'
+        || isAdmin()
+        || (signedIn() && resource.data.createdBy == request.auth.uid);
+
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['name', 'category', 'organizer', 'date', 'seats', 'venue', 'city',
+             'price', 'image', 'description', 'highlights', 'featured', 'status', 'createdBy', 'createdByEmail',
+             'createdAt', 'reviewedBy', 'reviewedAt'])
+        && request.resource.data.createdBy == request.auth.uid
+        && request.resource.data.createdByEmail == myEmail()
+        && request.resource.data.createdAt == request.time
+        && (request.resource.data.status == 'pending'
+            || (isAdmin() && request.resource.data.status == 'published' && request.resource.data.reviewedBy == myEmail()))
+        && (request.resource.data.featured == false || isAdmin())
+        && request.resource.data.name is string && request.resource.data.name.size() >= 3 && request.resource.data.name.size() <= 80
+        && request.resource.data.category in ['Music', 'Technology', 'Workshop', 'Sports', 'Food', 'Art', 'Business', 'Theatre', 'Wellness']
+        && request.resource.data.organizer is string && request.resource.data.organizer.size() <= 80
+        && request.resource.data.date is string && request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}$')
+        && request.resource.data.seats is int && request.resource.data.seats >= 1 && request.resource.data.seats <= 5000
+        && request.resource.data.venue is string && request.resource.data.venue.size() <= 100
+        && request.resource.data.city is string && request.resource.data.city.size() <= 50
+        && request.resource.data.price is int && request.resource.data.price >= 0 && request.resource.data.price <= 100000
+        && request.resource.data.image is string && request.resource.data.image.size() < 500000
+        && request.resource.data.description is string && request.resource.data.description.size() <= 600
+        && request.resource.data.highlights is list && request.resource.data.highlights.size() <= 6;
+
+      // Only admins approve, reject, unpublish or feature events
+      allow update: if isAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['status', 'reviewedBy', 'reviewedAt', 'rejectReason', 'featured'])
+        && request.resource.data.status in ['pending', 'published', 'rejected']
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['status'])
+            || request.resource.data.reviewedBy == myEmail());
+
+      // Organisers may withdraw their own events until they are live
+      allow delete: if isAdmin()
+        || (signedIn() && resource.data.createdBy == request.auth.uid && resource.data.status != 'published');
     }
 
     // ---------- Approved seat counts (public) ----------

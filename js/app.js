@@ -27,7 +27,14 @@
     cancelled: { label: 'Cancelled', short: 'Cancelled', icon: 'x' }
   };
 
-  const state = { category: 'All', search: '', sort: 'date', adminFilter: 'pending', adminSearch: '' };
+  const state = { category: 'All', search: '', sort: 'date', adminFilter: 'pending', adminSearch: '', eventFilter: 'pending' };
+
+  const EVENT_STATUS = {
+    pending: { label: 'Awaiting approval', short: 'Pending', icon: 'hourglass', cls: 'pending' },
+    published: { label: 'Live', short: 'Live', icon: 'check', cls: 'published' },
+    rejected: { label: 'Not approved', short: 'Rejected', icon: 'x', cls: 'rejected' }
+  };
+  const EVENT_CATEGORIES = ['Music', 'Technology', 'Workshop', 'Sports', 'Food', 'Art', 'Business', 'Theatre', 'Wellness'];
 
   // Live data (from Firestore)
   const fb = { auth: null, db: null };
@@ -38,6 +45,11 @@
   let adminList = [];                // admins (superadmin only)
   let booked = {};                   // eventId -> approved tickets
   let proofData = null;              // compressed payment screenshot (data URL)
+  const BASE_EVENTS = EVENTS.slice(); // built-in events from data.js
+  let liveEvents = [];               // published events from Firestore
+  let myEvents = [];                 // events this user submitted
+  let adminEvents = [];              // every submitted event (admins only)
+  let eventImage = null;             // compressed cover image for Host an Event
   let authResolved = false;
   const subs = {};                   // active Firestore listeners
 
@@ -72,7 +84,7 @@
   const imageHTML = (ev, extra = '') => `
     <div class="img-wrap ${extra}">
       <span class="fallback" aria-hidden="true">${escapeHTML((ev.name || 'E').charAt(0))}</span>
-      ${ev.image ? `<img src="${ev.image}" alt="${escapeHTML(ev.name)}" loading="lazy" onerror="this.classList.add('failed')">` : ''}
+      ${ev.image ? `<img src="${escapeHTML(ev.image)}" alt="${escapeHTML(ev.name)}" loading="lazy" onerror="this.classList.add('failed')">` : ''}
     </div>`;
 
   let toastTimer;
@@ -169,8 +181,9 @@
 
   function onAuthChanged(user) {
     authResolved = true;
-    ['myRegs', 'role', 'adminRegs', 'admins'].forEach(unlisten);
-    myRegs = []; adminRegs = []; adminList = [];
+    ['myRegs', 'role', 'adminRegs', 'admins', 'myEvents', 'adminEvents'].forEach(unlisten);
+    myRegs = []; adminRegs = []; adminList = []; myEvents = []; adminEvents = [];
+    state.eventFilter = 'pending';
     roles.admin = roles.superadmin = false;
     state.adminFilter = 'pending';
     state.adminSearch = '';
@@ -182,6 +195,7 @@
       roles.superadmin = !!SUPERADMIN && email === SUPERADMIN && user.emailVerified;
       roles.admin = roles.superadmin;
       listenMyRegistrations();
+      listenMyEvents();
       if (roles.superadmin) startAdminListeners();
       else listenRole();
     } else {
@@ -217,7 +231,7 @@
       const was = roles.admin;
       roles.admin = doc.exists;
       if (roles.admin && !was) { startAdminListeners(); toast('You now have admin access.'); }
-      if (!roles.admin && was) { unlisten('adminRegs'); adminRegs = []; }
+      if (!roles.admin && was) { unlisten('adminRegs'); unlisten('adminEvents'); adminRegs = []; adminEvents = []; }
       renderAuth();
       renderAdmin();
     });
@@ -226,6 +240,10 @@
   function startAdminListeners() {
     listen('adminRegs', fb.db.collection('registrations').orderBy('createdAt', 'desc').limit(300), (snap) => {
       adminRegs = snap.docs.map(docData);
+      renderAdmin();
+    });
+    listen('adminEvents', fb.db.collection('events').orderBy('createdAt', 'desc').limit(200), (snap) => {
+      adminEvents = snap.docs.map(docData);
       renderAdmin();
     });
     if (roles.superadmin) {
@@ -284,6 +302,12 @@
     $('#googleBtnNav').classList.toggle('hidden', signedIn);
     $('#userMenu').classList.toggle('hidden', !signedIn);
     $('#formShell').classList.toggle('locked', !signedIn);
+    $('#hostShell').classList.toggle('locked', !signedIn);
+    $('#evFeaturedRow').classList.toggle('hidden', !roles.admin);
+    $('#hostSubmit .btn-label').textContent = roles.admin ? 'Publish Event' : 'Submit for Approval';
+    $('#hostIntro').textContent = roles.admin
+      ? 'As an Eveora admin, events you publish here go live immediately.'
+      : "Present your event to Eveora's guests. Every submission is reviewed by our team and goes live once approved.";
     $('#userDropdown').hidden = true;
     $('#userChip').setAttribute('aria-expanded', 'false');
 
@@ -451,7 +475,7 @@
     const cats = ['All', ...new Set(EVENTS.map((e) => e.category))];
     $('#categoryChips').innerHTML = cats.map((c) => `
       <button class="chip ${c === state.category ? 'active' : ''}" role="tab"
-              aria-selected="${c === state.category}" data-cat="${c}">${c}</button>`).join('');
+              aria-selected="${c === state.category}" data-cat="${escapeHTML(c)}">${escapeHTML(c)}</button>`).join('');
   }
 
   function filteredEvents() {
@@ -710,7 +734,7 @@
   }
 
   // Shrink screenshots so they fit in a Firestore document (free plan, no file storage needed)
-  function compressImage(file, maxSide = 1600) {
+  function compressImage(file, maxSide = 1600, maxLen = 700000) {
     return new Promise((resolve, reject) => {
       const url = URL.createObjectURL(file);
       const img = new Image();
@@ -726,11 +750,11 @@
         URL.revokeObjectURL(url);
         let quality = 0.78;
         let data = canvas.toDataURL('image/jpeg', quality);
-        while (data.length > 700000 && quality > 0.35) {
+        while (data.length > maxLen && quality > 0.35) {
           quality -= 0.1;
           data = canvas.toDataURL('image/jpeg', quality);
         }
-        if (data.length > 880000) reject(new Error('too-large'));
+        if (data.length > maxLen * 1.25) reject(new Error('too-large'));
         else resolve(data);
       };
       img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('unreadable')); };
@@ -1208,7 +1232,8 @@
       if (r.status === 'approved') revenue += r.amount || 0;
       if (r.utr && r.status !== 'cancelled') utrCount[r.utr] = (utrCount[r.utr] || 0) + 1;
     });
-    $('#pendingCount').textContent = counts.pending;
+    const pendingEvents = renderAdminEvents();
+    $('#pendingCount').textContent = counts.pending + pendingEvents;
 
     $('#adminStats').innerHTML = `
       <div class="stat"><strong>${counts.pending}</strong><span>Awaiting review</span></div>
@@ -1284,6 +1309,318 @@
     }
   }
 
+  /* ---------- Event catalog: built-in + published events from Firestore ---------- */
+  const SAFE_IMAGE = /^(data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+|https:\/\/[^\s"'<>]+)$/;
+
+  // Normalise a Firestore event so it renders exactly like the built-in ones
+  const toEvent = (d) => ({
+    id: d.id,
+    name: d.name,
+    category: d.category,
+    date: d.date,
+    venue: d.venue,
+    city: d.city,
+    price: d.price,
+    seats: d.seats,
+    image: SAFE_IMAGE.test(d.image || '') ? d.image : '',
+    featured: !!d.featured,
+    organizer: d.organizer,
+    description: d.description,
+    highlights: Array.isArray(d.highlights) ? d.highlights : [],
+    community: true
+  });
+
+  function updateCatalog() {
+    EVENTS.splice(0, EVENTS.length, ...BASE_EVENTS, ...liveEvents.map(toEvent));
+    if (state.category !== 'All' && !EVENTS.some((e) => e.category === state.category)) state.category = 'All';
+    renderChips();
+    renderHeroNext();
+    renderFeatured();
+    renderEvents();
+    populateEventSelect();
+    updateFormSummary();
+    // Keep the hero's "Upcoming events" figure in step with the catalog
+    const upcoming = $('.hero-stats strong');
+    if (upcoming) upcoming.textContent = EVENTS.filter((e) => !isPast(e)).length;
+  }
+
+  function listenPublishedEvents() {
+    listen('liveEvents', fb.db.collection('events').where('status', '==', 'published'), (snap) => {
+      liveEvents = snap.docs.map(docData);
+      updateCatalog();
+    });
+  }
+
+  function listenMyEvents() {
+    listen('myEvents', fb.db.collection('events').where('createdBy', '==', currentUser.uid), (snap) => {
+      myEvents = snap.docs.map(docData).sort(byNewest);
+      renderMyEvents();
+    });
+  }
+
+  const eventBadge = (s) => `<span class="status-badge ${EVENT_STATUS[s].cls}">${ic(EVENT_STATUS[s].icon)} ${EVENT_STATUS[s].label}</span>`;
+
+  function renderMyEvents() {
+    const box = $('#myEvents');
+    if (!currentUser || !myEvents.length) { box.innerHTML = ''; return; }
+    box.innerHTML = `<h4>Your events</h4>` + myEvents.map((d) => {
+      const ev = toEvent(d);
+      return `
+        <div class="my-event">
+          ${imageHTML(ev)}
+          <div>
+            <strong>${escapeHTML(ev.name)}</strong>
+            <small>${formatDate(ev.date)} · ${escapeHTML(ev.city)}</small>
+            ${d.status === 'rejected' && d.rejectReason ? `<span class="reason">${escapeHTML(d.rejectReason)}</span>` : ''}
+          </div>
+          <div class="my-event-actions">
+            ${eventBadge(d.status)}
+            ${d.status === 'published' ? `<button class="btn btn-outline btn-sm" data-open="${ev.id}">View</button>` : `<button class="btn btn-ghost btn-sm" data-withdraw="${ev.id}">Withdraw</button>`}
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  /* ---------- Host an event (anyone signed in; admins publish directly) ---------- */
+  const hostForm = $('#hostForm');
+
+  const hostValidators = {
+    evName(v) { v = v.trim(); return v.length < 3 ? 'Please enter an event name (at least 3 characters).' : ''; },
+    evCategory(v) { return EVENT_CATEGORIES.includes(v) ? '' : 'Please choose a category.'; },
+    evOrganizer(v) { return v.trim().length < 2 ? 'Please enter who is hosting the event.' : ''; },
+    evDate(v) {
+      if (!v) return 'Please choose a date and time.';
+      if (new Date(v) < new Date()) return 'The event must be in the future.';
+      return '';
+    },
+    evSeats(v) {
+      const n = Number(v);
+      return Number.isInteger(n) && n >= 1 && n <= 5000 ? '' : 'Seats must be a whole number between 1 and 5,000.';
+    },
+    evVenue(v) { return v.trim().length < 2 ? 'Please enter the venue.' : ''; },
+    evCity(v) { return v.trim().length < 2 ? 'Please enter the city.' : ''; },
+    evPrice(v) {
+      if (v === '') return 'Please enter a price (0 for complimentary).';
+      const n = Number(v);
+      return Number.isInteger(n) && n >= 0 && n <= 100000 ? '' : 'Price must be a whole number from 0 to 1,00,000.';
+    },
+    evDescription(v) {
+      v = v.trim();
+      if (v.length < 20) return 'Please describe the event in at least 20 characters.';
+      return v.length > 600 ? 'Keep the description under 600 characters.' : '';
+    },
+    evHighlights(v) {
+      const lines = v.split('\n').map((l) => l.trim()).filter(Boolean);
+      if (lines.length > 6) return 'Add up to 6 highlights.';
+      return lines.some((l) => l.length > 80) ? 'Keep each highlight under 80 characters.' : '';
+    }
+  };
+
+  function validateHostField(el) {
+    const fn = hostValidators[el.name];
+    if (!fn) return true;
+    const msg = fn(el.value);
+    setFieldState(el, msg);
+    return !msg;
+  }
+
+  function resetHostForm() {
+    hostForm.reset();
+    eventImage = null;
+    const img = $('#evImagePreview');
+    img.removeAttribute('src');
+    img.hidden = true;
+    $('#evImageBox').classList.remove('has-file');
+    $$('.form-group', hostForm).forEach((g) => g.classList.remove('valid', 'invalid'));
+    $$('.error-msg', hostForm).forEach((m) => { m.textContent = ''; });
+  }
+
+  function initHost() {
+    $('#evCategory').innerHTML = '<option value="">Choose a category</option>' +
+      EVENT_CATEGORIES.map((c) => `<option value="${c}">${c}</option>`).join('');
+
+    const fields = $$('input:not([type="file"]):not([type="checkbox"]), select, textarea', hostForm);
+    fields.forEach((el) => {
+      el.addEventListener('blur', () => validateHostField(el));
+      el.addEventListener(el.tagName === 'SELECT' ? 'change' : 'input', () => {
+        if (el.closest('.form-group').classList.contains('invalid')) validateHostField(el);
+      });
+    });
+
+    $('#evImage').addEventListener('change', async (e) => {
+      const input = e.target;
+      const file = input.files && input.files[0];
+      eventImage = null;
+      $('#evImageBox').classList.remove('has-file');
+      $('#evImagePreview').hidden = true;
+      if (!file) return;
+      if (!/^image\/(png|jpe?g|webp)$/.test(file.type) || file.size > 10 * 1024 * 1024) {
+        input.value = '';
+        setFieldState(input, 'Please choose a JPG, PNG or WebP image up to 10 MB.');
+        return;
+      }
+      $('#evImageBox').classList.add('busy');
+      try {
+        eventImage = await compressImage(file, 1400, 380000);
+        const img = $('#evImagePreview');
+        img.src = eventImage;
+        img.hidden = false;
+        $('#evImageBox').classList.add('has-file');
+        setFieldState(input, '');
+      } catch (err) {
+        input.value = '';
+        setFieldState(input, 'That image could not be used. Please try another one.');
+      } finally {
+        $('#evImageBox').classList.remove('busy');
+      }
+    });
+
+    hostForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!currentUser) { toast('Please sign in with Google to host an event.'); return; }
+      if (!firebaseReady()) { backendMissing(); return; }
+      if (!fields.map(validateHostField).every(Boolean)) {
+        const firstBad = $('.form-group.invalid input, .form-group.invalid select, .form-group.invalid textarea', hostForm);
+        if (firstBad) firstBad.focus();
+        toast('Please review the highlighted fields.');
+        return;
+      }
+
+      const publish = roles.admin;
+      const doc = {
+        name: hostForm.evName.value.trim(),
+        category: hostForm.evCategory.value,
+        organizer: hostForm.evOrganizer.value.trim(),
+        date: hostForm.evDate.value.slice(0, 16),
+        seats: Number(hostForm.evSeats.value),
+        venue: hostForm.evVenue.value.trim(),
+        city: hostForm.evCity.value.trim(),
+        price: Number(hostForm.evPrice.value),
+        image: eventImage || '',
+        description: hostForm.evDescription.value.trim(),
+        highlights: hostForm.evHighlights.value.split('\n').map((l) => l.trim()).filter(Boolean).slice(0, 6),
+        featured: publish && hostForm.evFeatured.checked,
+        status: publish ? 'published' : 'pending',
+        createdBy: currentUser.uid,
+        createdByEmail: currentUser.email,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      if (publish) {
+        doc.reviewedBy = currentUser.email;
+        doc.reviewedAt = firebase.firestore.FieldValue.serverTimestamp();
+      }
+
+      const btn = $('#hostSubmit');
+      btn.classList.add('loading');
+      btn.disabled = true;
+      try {
+        await fb.db.collection('events').add(doc);
+        resetHostForm();
+        toast(publish ? 'Your event is now live.' : 'Submitted — our team will review your event shortly.');
+      } catch (err) {
+        console.error('[Eveora] Event submission failed', err);
+        toast('Your event could not be submitted. Please try again.');
+      } finally {
+        btn.classList.remove('loading');
+        btn.disabled = false;
+      }
+    });
+
+    $('#myEvents').addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-withdraw]');
+      if (!btn) return;
+      const ok = await askConfirm({ title: 'Withdraw this event?', text: 'It will be removed from review. You can submit it again later.', okLabel: 'Withdraw', danger: true });
+      if (ok === false) return;
+      try { await fb.db.collection('events').doc(btn.dataset.withdraw).delete(); toast('Event withdrawn.'); }
+      catch (err) { console.error('[Eveora] Withdraw failed', err); toast('Could not withdraw this event.'); }
+    });
+  }
+
+  /* ---------- Admin: event approvals ---------- */
+  const EVENT_FILTERS = ['pending', 'published', 'rejected', 'all'];
+
+  function eventReviewHTML(d, i) {
+    const ev = toEvent(d);
+    const actions = d.status === 'pending'
+      ? `<button class="btn btn-ghost btn-sm" data-ev-review="reject" data-id="${ev.id}">Reject</button>
+         <button class="btn btn-primary btn-sm" data-ev-review="publish" data-id="${ev.id}">${ic('check')} Approve &amp; publish</button>`
+      : d.status === 'published'
+        ? `<button class="btn btn-outline btn-sm" data-ev-review="feature" data-id="${ev.id}">${d.featured ? 'Remove from featured' : 'Feature on home page'}</button>
+           <button class="btn btn-ghost btn-sm" data-ev-review="unpublish" data-id="${ev.id}">Unpublish</button>`
+        : `<button class="btn btn-outline btn-sm" data-ev-review="publish" data-id="${ev.id}">Approve &amp; publish</button>`;
+    return `
+      <article class="review-card event-review" data-status="${d.status === 'published' ? 'approved' : d.status}" style="animation-delay:${Math.min(i, 8) * 40}ms">
+        ${imageHTML(ev)}
+        <div>
+          <div class="rc-head">
+            <div>
+              <h4>${escapeHTML(ev.name)}</h4>
+              <p>${escapeHTML(ev.category)} · ${formatDate(ev.date)} · ${formatTime(ev.date)}</p>
+            </div>
+            ${eventBadge(d.status)}
+          </div>
+          <div class="rc-grid">
+            <div><small>Venue</small><strong>${escapeHTML(ev.venue)}, ${escapeHTML(ev.city)}</strong></div>
+            <div><small>Price · Seats</small><strong>${formatPrice(ev.price)} · ${ev.seats}</strong></div>
+            <div><small>Hosted by</small><strong>${escapeHTML(ev.organizer)}</strong></div>
+            <div><small>Submitted by</small><strong>${escapeHTML(d.createdByEmail)}</strong></div>
+            <div><small>Submitted</small><strong>${formatStamp(d.createdAt)}</strong></div>
+            <div><small>Featured</small><strong>${d.featured ? 'Yes' : 'No'}</strong></div>
+          </div>
+          <p class="er-desc">${escapeHTML(ev.description)}</p>
+          ${d.status === 'rejected' && d.rejectReason ? `<p class="rc-note">Reason: ${escapeHTML(d.rejectReason)}</p>` : ''}
+          ${d.reviewedBy ? `<p class="rc-meta">Reviewed by ${escapeHTML(d.reviewedBy)} · ${formatStamp(d.reviewedAt)}</p>` : ''}
+          <div class="rc-actions"><span class="spacer"></span>${actions}</div>
+        </div>
+      </article>`;
+  }
+
+  function renderAdminEvents() {
+    const counts = { pending: 0, published: 0, rejected: 0 };
+    adminEvents.forEach((d) => { counts[d.status] = (counts[d.status] || 0) + 1; });
+    $('#eventFilters').innerHTML = EVENT_FILTERS.map((f) => `
+      <button class="chip ${state.eventFilter === f ? 'active' : ''}" data-ev-filter="${f}">
+        ${f === 'all' ? 'All' : EVENT_STATUS[f].short}${f === 'all' ? '' : ` · ${counts[f] || 0}`}
+      </button>`).join('');
+    const list = adminEvents.filter((d) => state.eventFilter === 'all' || d.status === state.eventFilter);
+    $('#eventReviewList').innerHTML = list.length
+      ? list.map(eventReviewHTML).join('')
+      : `<div class="empty-state">${ic('calendar')}<h3>Nothing to review</h3><p>No ${state.eventFilter === 'all' ? '' : EVENT_STATUS[state.eventFilter].short.toLowerCase() + ' '}events right now.</p></div>`;
+    return counts.pending;
+  }
+
+  async function reviewEvent(id, action) {
+    const d = adminEvents.find((x) => x.id === id);
+    if (!d) return;
+    const FV = firebase.firestore.FieldValue;
+    const ref = fb.db.collection('events').doc(id);
+    let update;
+
+    if (action === 'feature') {
+      update = { featured: !d.featured };
+    } else if (action === 'publish') {
+      update = { status: 'published', reviewedBy: currentUser.email, reviewedAt: FV.serverTimestamp(), rejectReason: FV.delete() };
+    } else {
+      const reason = await askConfirm({
+        title: action === 'reject' ? 'Reject this event?' : 'Unpublish this event?',
+        text: 'Tell the organiser why — they will see this message.',
+        okLabel: action === 'reject' ? 'Reject event' : 'Unpublish',
+        danger: true,
+        input: { placeholder: 'e.g. Please add the venue address and a clearer cover image' }
+      });
+      if (reason === false) return;
+      update = { status: 'rejected', reviewedBy: currentUser.email, reviewedAt: FV.serverTimestamp(), rejectReason: reason.slice(0, 200), featured: false };
+    }
+
+    try {
+      await ref.update(update);
+      toast(action === 'publish' ? `“${d.name}” is now live.` : action === 'feature' ? 'Featured setting updated.' : 'The organiser has been notified.');
+    } catch (err) {
+      console.error('[Eveora] Event review failed', err);
+      toast('Could not update this event. Please try again.');
+    }
+  }
+
   /* ---------- Admin: team management (superadmin) ---------- */
   function renderAdminManager() {
     if (!roles.superadmin) return;
@@ -1314,6 +1651,17 @@
     $('#reviewList').addEventListener('click', (e) => {
       const btn = e.target.closest('[data-review]');
       if (btn) reviewRegistration(btn.dataset.id, btn.dataset.review);
+    });
+
+    $('#eventFilters').addEventListener('click', (e) => {
+      const chip = e.target.closest('[data-ev-filter]');
+      if (!chip) return;
+      state.eventFilter = chip.dataset.evFilter;
+      renderAdminEvents();
+    });
+    $('#eventReviewList').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-ev-review]');
+      if (btn) reviewEvent(btn.dataset.id, btn.dataset.evReview);
     });
 
     $('#addAdminForm').addEventListener('submit', async (e) => {
@@ -1411,11 +1759,13 @@
     initProofUpload();
     initBookings();
     initAdmin();
+    initHost();
     initScrollEffects();
     setInterval(updateCountdowns, 1000);
 
     if (ready) {
       listenStats();
+      listenPublishedEvents();
       fb.auth.onAuthStateChanged(onAuthChanged);
     } else {
       console.warn('[Eveora] Firebase is not configured – browsing only.');
