@@ -1,19 +1,19 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="EventSphere terms of service.">
-  <title>Terms of Service – EventSphere</title>
+  <meta name="description" content="Eveora terms of service.">
+  <title>Terms of Service – Eveora</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
   <script>
     (function () {
       try {
-        var t = localStorage.getItem('es-theme') ||
-          (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        var t = localStorage.getItem('eveora-theme') ||
+          (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
         document.documentElement.setAttribute('data-theme', t);
       } catch (e) {}
     })();
@@ -22,10 +22,10 @@
 <body>
   <header class="navbar scrolled">
     <div class="container nav-inner">
-      <a href="./" class="logo" aria-label="EventSphere home">
-        <span class="logo-icon">◉</span><span class="logo-text">Event<span>Sphere</span></span>
+      <a href="./" class="logo" aria-label="Eveora home">
+        <span class="logo-mark" aria-hidden="true">E</span><span class="logo-text">Eveora</span>
       </a>
-      <a href="./" class="btn btn-outline">← Back to events</a>
+      <a href="./" class="btn btn-outline btn-sm">Back to events</a>
     </div>
   </header>
 
@@ -34,35 +34,42 @@
     <h1>Terms of Service</h1>
     <p class="updated">Last updated: 3 November 2026</p>
 
-    <p>By using EventSphere you agree to these terms. If you do not agree, please do not use the website.</p>
+    <p>By using Eveora you agree to these terms. If you do not agree, please do not use the website.</p>
 
-    <h2>1. About EventSphere</h2>
-    <p>EventSphere is a student web-design project built for demonstration. The events, prices, venues and seat
-      counts shown are <strong>sample data</strong>. Registering does not buy a real ticket or reserve a real
-      seat, and no payments are processed.</p>
+    <h2>1. About Eveora</h2>
+    <p>Eveora is a student web-design project. Unless the organiser states otherwise, the events, prices, venues and
+      seat counts shown are <strong>sample data</strong> for demonstration. While the site shows “demo mode” on the
+      payment step, please do not send any money.</p>
 
-    <h2>2. Your account</h2>
-    <p>You sign in with your Google account. You are responsible for the activity that happens while you are
-      signed in on your device. Your information is handled as described in our
-      <a href="privacy.html">Privacy Policy</a>.</p>
-
-    <h2>3. Acceptable use</h2>
+    <h2>2. Reservations and payment verification</h2>
     <ul>
-      <li>Enter only information that belongs to you.</li>
+      <li>Payments are made directly to the organiser by UPI. Eveora does not process payments or store card or bank details.</li>
+      <li>After paying, you submit the UTR / UPI reference number and a screenshot of the payment.</li>
+      <li>An Eveora administrator checks every submission manually. <strong>Your reservation is confirmed and your ticket
+        is issued only after an administrator approves it.</strong></li>
+      <li>Submissions with an incorrect, reused or unverifiable UTR or screenshot may be rejected.</li>
+      <li>You may cancel a reservation while it is under verification. Refunds for payments already made are handled
+        directly by the organiser.</li>
+    </ul>
+
+    <h2>3. Your account</h2>
+    <p>You sign in with your Google account and are responsible for activity on your device while signed in. Your
+      information is handled as described in our <a href="privacy.html">Privacy Policy</a>.</p>
+
+    <h2>4. Acceptable use</h2>
+    <ul>
+      <li>Submit only genuine information and your own payment proof.</li>
+      <li>Do not upload content that is unlawful, misleading or belongs to someone else.</li>
       <li>Do not try to break, overload or misuse the website.</li>
     </ul>
 
-    <h2>4. Content</h2>
+    <h2>5. Content</h2>
     <p>Event images are provided by <a href="https://unsplash.com" target="_blank" rel="noopener">Unsplash</a>
-      under the Unsplash License. Names of venues and places are used only to make the sample events realistic.</p>
+      under the Unsplash License. Venue and place names are used only to make the sample events realistic.</p>
 
-    <h2>5. No warranty</h2>
-    <p>The website is provided “as is”, without warranties of any kind. It may change, contain errors or be
-      unavailable at any time.</p>
-
-    <h2>6. Limitation of liability</h2>
-    <p>To the extent allowed by law, the EventSphere authors are not liable for any loss or damage arising from
-      your use of the website.</p>
+    <h2>6. No warranty and limitation of liability</h2>
+    <p>The website is provided “as is”, without warranties of any kind, and may change or be unavailable at any time.
+      To the extent allowed by law, the Eveora authors are not liable for any loss arising from your use of the website.</p>
 
     <h2>7. Changes and contact</h2>
     <p>We may update these terms and will change the date above when we do. Questions? Open an issue on the
@@ -73,7 +80,7 @@
 
   <footer class="footer">
     <div class="container">
-      <p class="copy">© 2026 EventSphere · Built with HTML, CSS &amp; JavaScript</p>
+      <p class="copy">© 2026 Eveora · Where moments come alive.</p>
     </div>
   </footer>
 </body>

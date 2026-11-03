@@ -1,20 +1,20 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="EventSphere – discover, explore and register for the best upcoming events near you.">
-  <title>EventSphere – Discover & Book Events</title>
+  <meta name="description" content="Eveora – Where moments come alive. Discover and book exceptional events.">
+  <title>Eveora – Where moments come alive</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
   <script>
-    // Apply saved theme before paint to avoid a flash
+    // Apply saved theme before paint (dark by default)
     (function () {
       try {
-        var t = localStorage.getItem('es-theme') ||
-          (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        var t = localStorage.getItem('eveora-theme') ||
+          (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
         document.documentElement.setAttribute('data-theme', t);
       } catch (e) {}
     })();
@@ -22,43 +22,71 @@
 </head>
 <body>
 
+  <!-- Line icons used across the page -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+    <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></symbol>
+    <symbol id="i-ticket" viewBox="0 0 24 24"><path d="M3 7h18v3.5a1.5 1.5 0 0 0 0 3V17H3v-3.5a1.5 1.5 0 0 0 0-3z"/><path d="M15 7v10" stroke-dasharray="1.5 2"/></symbol>
+    <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 13.5A8 8 0 1 1 10.5 4a6.5 6.5 0 0 0 9.5 9.5z"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 15V4M7.5 8.5L12 4l4.5 4.5M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a1 1 0 0 1 1-1h10"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-left" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></symbol>
+    <symbol id="i-right" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+    <symbol id="i-hourglass" viewBox="0 0 24 24"><path d="M6 3h12M6 21h12M7 3c0 5 5 6 5 9s-5 4-5 9M17 3c0 5-5 6-5 9s5 4 5 9"/></symbol>
+    <symbol id="i-crown" viewBox="0 0 24 24"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5z"/></symbol>
+    <symbol id="i-logout" viewBox="0 0 24 24"><path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4M10 17l5-5-5-5M15 12H4"/></symbol>
+    <symbol id="i-building" viewBox="0 0 24 24"><path d="M4 21V5a1 1 0 0 1 1-1h9a1 1 0 0 1 1 1v16M15 9h4a1 1 0 0 1 1 1v11M3 21h18M8 8h3M8 12h3M8 16h3"/></symbol>
+    <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></symbol>
+  </svg>
+
   <!-- ========== HEADER / NAVBAR ========== -->
   <header class="navbar" id="navbar">
     <div class="container nav-inner">
-      <a href="#home" class="logo" aria-label="EventSphere home">
-        <span class="logo-icon">◉</span><span class="logo-text">Event<span>Sphere</span></span>
+      <a href="#home" class="logo" aria-label="Eveora home">
+        <span class="logo-mark" aria-hidden="true">E</span><span class="logo-text">Eveora</span>
       </a>
 
       <nav class="nav-links" id="navLinks" aria-label="Main navigation">
         <a href="#home" class="active">Home</a>
         <a href="#featured">Featured</a>
         <a href="#events">Events</a>
-        <a href="#register">Register</a>
+        <a href="#register">Reserve</a>
         <a href="#my-registrations">My Bookings <span class="badge" id="bookingCount">0</span></a>
+        <a href="#admin" id="adminNavLink" class="hidden">Admin <span class="badge" id="pendingCount">0</span></a>
       </nav>
 
       <div class="nav-actions">
-        <!-- Auth: Google Sign-In only -->
         <div class="auth" id="authArea">
           <div class="g-btn-slot" id="googleBtnNav" data-size="nav"></div>
           <div class="user-menu hidden" id="userMenu">
             <button class="user-chip" id="userChip" aria-haspopup="true" aria-expanded="false">
               <span class="avatar" id="userAvatar"></span>
               <span class="user-name" id="userName"></span>
-              <span class="caret" aria-hidden="true">▾</span>
+              <span class="role-pill hidden" id="userRole"></span>
             </button>
             <div class="user-dropdown" id="userDropdown" hidden>
               <div class="dd-head">
                 <span class="avatar avatar-lg" id="ddAvatar"></span>
                 <div><strong id="ddName"></strong><small id="ddEmail"></small></div>
               </div>
-              <a href="#my-registrations" class="dd-item">🎟️ My Bookings</a>
-              <button class="dd-item" id="signOutBtn">↪ Sign out</button>
+              <a href="#my-registrations" class="dd-item"><svg class="ic"><use href="#i-ticket"/></svg> My Bookings</a>
+              <a href="#admin" class="dd-item hidden" id="ddAdmin"><svg class="ic"><use href="#i-crown"/></svg> Admin panel</a>
+              <button class="dd-item" id="signOutBtn"><svg class="ic"><use href="#i-logout"/></svg> Sign out</button>
             </div>
           </div>
         </div>
-        <button class="icon-btn" id="themeToggle" aria-label="Toggle dark mode" title="Toggle theme">
-          <span class="sun">☀️</span><span class="moon">🌙</span>
+        <button class="icon-btn" id="themeToggle" aria-label="Toggle light and dark theme" title="Toggle theme">
+          <svg class="ic sun"><use href="#i-sun"/></svg><svg class="ic moon"><use href="#i-moon"/></svg>
         </button>
         <button class="hamburger" id="hamburger" aria-label="Open menu" aria-expanded="false">
           <span></span><span></span><span></span>
@@ -70,32 +98,28 @@
   <main>
     <!-- ========== HERO ========== -->
     <section class="hero" id="home">
-      <div class="hero-bg" aria-hidden="true">
-        <span class="blob b1"></span><span class="blob b2"></span><span class="blob b3"></span>
-      </div>
+      <div class="hero-bg" aria-hidden="true"></div>
       <div class="container hero-inner">
         <div class="hero-text reveal">
-          <span class="pill">🎉 New events added every week</span>
-          <h1>Discover events that <span class="gradient-text">move you.</span></h1>
-          <p>Concerts, tech summits, workshops, food festivals and more — explore what's happening,
-            see every detail, and lock in your spot in seconds.</p>
+          <span class="eyebrow">Curated experiences · India</span>
+          <h1>Where moments <em>come alive.</em></h1>
+          <p>An invitation-worthy collection of concerts, summits, galas and masterclasses. Reserve your place
+            in a few elegant steps — every booking personally verified.</p>
 
           <form class="hero-search" id="heroSearch" role="search">
-            <span aria-hidden="true">🔍</span>
-            <input type="search" id="heroSearchInput" placeholder="Search events, venues, cities..." aria-label="Search events">
-            <button type="submit" class="btn btn-primary">Search</button>
+            <svg class="ic" aria-hidden="true"><use href="#i-search"/></svg>
+            <input type="search" id="heroSearchInput" placeholder="Search events, venues or cities" aria-label="Search events">
+            <button type="submit" class="btn btn-primary">Explore</button>
           </form>
 
           <div class="hero-stats">
             <div><strong data-count="12">0</strong><span>Upcoming events</span></div>
             <div><strong data-count="8">0</strong><span>Cities</span></div>
-            <div><strong data-count="25000" data-suffix="+">0</strong><span>Attendees</span></div>
+            <div><strong data-count="25000" data-suffix="+">0</strong><span>Guests hosted</span></div>
           </div>
         </div>
 
-        <div class="hero-card reveal" id="heroNext">
-          <!-- Filled by JS: next upcoming event with countdown -->
-        </div>
+        <div class="hero-card reveal" id="heroNext"></div>
       </div>
     </section>
 
@@ -103,14 +127,14 @@
     <section class="section" id="featured">
       <div class="container">
         <div class="section-head reveal">
-          <span class="eyebrow">Don't miss out</span>
-          <h2>Featured Events</h2>
-          <p>Hand-picked experiences our community is most excited about.</p>
+          <span class="eyebrow">The Season's Finest</span>
+          <h2>Featured Experiences</h2>
+          <p>Hand-selected evenings our guests anticipate the most.</p>
         </div>
         <div class="featured-track-wrap">
-          <button class="slider-btn prev" id="featPrev" aria-label="Previous featured events">‹</button>
+          <button class="slider-btn prev" id="featPrev" aria-label="Previous featured events"><svg class="ic"><use href="#i-left"/></svg></button>
           <div class="featured-track" id="featuredTrack"></div>
-          <button class="slider-btn next" id="featNext" aria-label="Next featured events">›</button>
+          <button class="slider-btn next" id="featNext" aria-label="Next featured events"><svg class="ic"><use href="#i-right"/></svg></button>
         </div>
       </div>
     </section>
@@ -119,20 +143,20 @@
     <section class="section section-alt" id="events">
       <div class="container">
         <div class="section-head reveal">
-          <span class="eyebrow">Browse</span>
+          <span class="eyebrow">The Collection</span>
           <h2>Upcoming Events</h2>
-          <p>Search, filter by category and sort to find your perfect event.</p>
+          <p>Search, refine by category and sort to find your next occasion.</p>
         </div>
 
         <div class="toolbar reveal">
           <div class="search-box">
-            <span aria-hidden="true">🔍</span>
-            <input type="search" id="searchInput" placeholder="Search by name, venue or city..." aria-label="Search events">
+            <svg class="ic" aria-hidden="true"><use href="#i-search"/></svg>
+            <input type="search" id="searchInput" placeholder="Search by name, venue or city" aria-label="Search events">
           </div>
           <select id="sortSelect" aria-label="Sort events">
-            <option value="date">Sort: Soonest first</option>
-            <option value="price-low">Price: Low to high</option>
-            <option value="price-high">Price: High to low</option>
+            <option value="date">Soonest first</option>
+            <option value="price-low">Price: low to high</option>
+            <option value="price-high">Price: high to low</option>
             <option value="name">Name: A–Z</option>
           </select>
         </div>
@@ -143,7 +167,6 @@
         <div class="events-grid" id="eventsGrid"></div>
 
         <div class="empty-state hidden" id="emptyState">
-          <div class="empty-icon">🔎</div>
           <h3>No events found</h3>
           <p>Try a different keyword or category.</p>
           <button class="btn btn-outline" id="resetFilters">Reset filters</button>
@@ -155,89 +178,176 @@
     <section class="section" id="register">
       <div class="container register-wrap">
         <div class="register-info reveal">
-          <span class="eyebrow">Book your spot</span>
-          <h2>Register for an Event</h2>
-          <p>Sign in with Google, pick your event and we'll reserve your seat instantly. Your bookings
-            are linked to your Google account so you can view or cancel them anytime.</p>
-          <ul class="perks">
-            <li><span>🔑</span> One-tap sign in with Google</li>
-            <li><span>⚡</span> Instant confirmation with ticket ID</li>
-            <li><span>🔒</span> Your data stays in your browser</li>
-            <li><span>↩️</span> Free cancellation from “My Bookings”</li>
-          </ul>
+          <span class="eyebrow">Reservations</span>
+          <h2>Reserve Your Place</h2>
+          <p>Sign in with Google, choose your event and complete your payment by UPI. Our team verifies every
+            payment personally — your ticket is issued the moment it is approved.</p>
+          <ol class="steps">
+            <li><span>I</span><div><strong>Sign in</strong><small>One tap with your Google account</small></div></li>
+            <li><span>II</span><div><strong>Pay by UPI</strong><small>Scan, pay and note the UTR number</small></div></li>
+            <li><span>III</span><div><strong>Submit proof</strong><small>UTR number and payment screenshot</small></div></li>
+            <li><span>IV</span><div><strong>Receive your ticket</strong><small>Issued after our team approves</small></div></li>
+          </ol>
           <div class="selected-preview" id="selectedPreview"></div>
         </div>
 
         <div class="form-shell reveal" id="formShell">
-        <div class="auth-gate" id="authGate">
-          <div class="gate-icon">🔐</div>
-          <h3>Sign in to register</h3>
-          <p>Sign in with your Google account to book events. Your name and email are filled in for you.</p>
-          <div class="g-btn-slot" id="googleBtnGate" data-size="large"></div>
-        </div>
-        <form class="register-form" id="registerForm" novalidate>
-          <div class="form-group">
-            <label for="fullName">Full Name <span class="req">*</span></label>
-            <input type="text" id="fullName" name="fullName" placeholder="e.g. Aarav Sharma" autocomplete="name">
-            <small class="error-msg" aria-live="polite"></small>
+          <div class="auth-gate" id="authGate">
+            <svg class="ic gate-icon" aria-hidden="true"><use href="#i-lock"/></svg>
+            <h3>Sign in to reserve</h3>
+            <p>Use your Google account to book. Your name and email are filled in for you.</p>
+            <div class="g-btn-slot" id="googleBtnGate" data-size="large"></div>
           </div>
 
-          <div class="form-row">
+          <form class="register-form" id="registerForm" novalidate>
             <div class="form-group">
-              <label for="email">Email Address <span class="req">*</span></label>
-              <input type="email" id="email" name="email" placeholder="you@example.com" autocomplete="email" readonly title="Taken from your Google account">
+              <label for="fullName">Full name <span class="req">*</span></label>
+              <input type="text" id="fullName" name="fullName" placeholder="e.g. Aarav Sharma" autocomplete="name">
               <small class="error-msg" aria-live="polite"></small>
             </div>
-            <div class="form-group">
-              <label for="phone">Phone Number <span class="req">*</span></label>
-              <input type="tel" id="phone" name="phone" placeholder="10-digit mobile number" autocomplete="tel" maxlength="14">
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="email">Email address <span class="req">*</span></label>
+                <input type="email" id="email" name="email" placeholder="you@example.com" autocomplete="email" readonly title="Taken from your Google account">
+                <small class="error-msg" aria-live="polite"></small>
+              </div>
+              <div class="form-group">
+                <label for="phone">Phone number <span class="req">*</span></label>
+                <input type="tel" id="phone" name="phone" placeholder="10-digit mobile number" autocomplete="tel" maxlength="14">
+                <small class="error-msg" aria-live="polite"></small>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="eventSelect">Event <span class="req">*</span></label>
+                <select id="eventSelect" name="eventSelect">
+                  <option value="">Choose an event</option>
+                </select>
+                <small class="error-msg" aria-live="polite"></small>
+              </div>
+              <div class="form-group">
+                <label for="tickets">Tickets <span class="req">*</span></label>
+                <input type="number" id="tickets" name="tickets" min="1" max="5" value="1">
+                <small class="error-msg" aria-live="polite"></small>
+              </div>
+            </div>
+
+            <!-- Payment (paid events only) -->
+            <div class="payment-block hidden" id="paymentBlock">
+              <div class="pay-head">
+                <div>
+                  <span class="eyebrow">Payment</span>
+                  <h3>Pay by UPI</h3>
+                </div>
+                <div class="pay-amount"><small>Amount due</small><strong id="payAmount">₹0</strong></div>
+              </div>
+              <div class="pay-body">
+                <div class="pay-qr" id="payQr"></div>
+                <div class="pay-info">
+                  <p class="pay-step"><span>1</span>Scan the QR code or pay to this UPI ID</p>
+                  <div class="upi-row" id="upiRow">
+                    <code id="upiId">—</code>
+                    <button type="button" class="copy-btn" id="copyUpi" aria-label="Copy UPI ID"><svg class="ic"><use href="#i-copy"/></svg></button>
+                  </div>
+                  <a class="btn btn-outline btn-sm" id="upiLink" href="#">Open UPI app</a>
+                  <p class="pay-step"><span>2</span>Enter the UTR number and upload your payment screenshot below</p>
+                  <p class="demo-note hidden" id="payDemoNote">Demo mode: payment details are not set up yet, so please don't send money.
+                    Enter any 12-digit number and a screenshot to try the flow.</p>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="utr">UTR / UPI reference number <span class="req">*</span></label>
+                <input type="text" id="utr" name="utr" placeholder="12-digit number from your payment app" maxlength="26" autocomplete="off" spellcheck="false">
+                <small class="error-msg" aria-live="polite"></small>
+              </div>
+
+              <div class="form-group">
+                <label for="proof">Payment screenshot <span class="req">*</span></label>
+                <label class="upload-box" id="uploadBox">
+                  <input type="file" id="proof" name="proof" accept="image/png,image/jpeg,image/webp">
+                  <span class="upload-empty">
+                    <svg class="ic"><use href="#i-upload"/></svg>
+                    <strong>Choose a screenshot</strong> or drop it here
+                    <small>JPG, PNG or WebP · up to 10 MB</small>
+                  </span>
+                  <span class="upload-busy"><span class="spinner"></span> Preparing image…</span>
+                  <img id="proofPreview" alt="Payment screenshot preview" hidden>
+                </label>
+                <small class="error-msg" aria-live="polite"></small>
+              </div>
+            </div>
+
+            <div class="form-group checkbox-group">
+              <label class="checkbox">
+                <input type="checkbox" id="terms" name="terms">
+                <span>I agree to the <a href="terms.html" target="_blank" rel="noopener">terms of service</a></span>
+              </label>
               <small class="error-msg" aria-live="polite"></small>
             </div>
-          </div>
 
-          <div class="form-row">
-            <div class="form-group">
-              <label for="eventSelect">Select Event <span class="req">*</span></label>
-              <select id="eventSelect" name="eventSelect">
-                <option value="">-- Choose an event --</option>
-              </select>
-              <small class="error-msg" aria-live="polite"></small>
-            </div>
-            <div class="form-group">
-              <label for="tickets">Tickets <span class="req">*</span></label>
-              <input type="number" id="tickets" name="tickets" min="1" max="5" value="1">
-              <small class="error-msg" aria-live="polite"></small>
-            </div>
-          </div>
+            <div class="total-line"><span>Total</span><strong id="totalPrice">₹0</strong></div>
 
-          <div class="form-group checkbox-group">
-            <label class="checkbox">
-              <input type="checkbox" id="terms" name="terms">
-              <span>I agree to the event terms & conditions</span>
-            </label>
-            <small class="error-msg" aria-live="polite"></small>
-          </div>
-
-          <div class="total-line">Total: <strong id="totalPrice">₹0</strong></div>
-
-          <button type="submit" class="btn btn-primary btn-block" id="submitBtn">
-            <span class="btn-label">Confirm Registration</span>
-            <span class="spinner" aria-hidden="true"></span>
-          </button>
-        </form>
+            <button type="submit" class="btn btn-primary btn-block" id="submitBtn">
+              <span class="btn-label">Confirm Reservation</span>
+              <span class="spinner" aria-hidden="true"></span>
+            </button>
+          </form>
         </div>
       </div>
     </section>
 
-    <!-- ========== MY REGISTRATIONS ========== -->
+    <!-- ========== MY BOOKINGS ========== -->
     <section class="section section-alt" id="my-registrations">
       <div class="container">
         <div class="section-head reveal">
-          <span class="eyebrow">Saved locally</span>
+          <span class="eyebrow">Your Reservations</span>
           <h2>My Bookings</h2>
-          <p>Registrations for your Google account, saved in this browser with Local Storage.</p>
+          <p>Follow each payment as it's verified. Your ticket appears here once approved.</p>
         </div>
         <div class="bookings-list" id="bookingsList"></div>
+      </div>
+    </section>
+
+    <!-- ========== ADMIN ========== -->
+    <section class="section hidden" id="admin">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Concierge Desk</span>
+          <h2>Payment Verification</h2>
+          <p>Match each UTR and screenshot against your payment app, then approve or reject.
+            Approving issues the guest's ticket.</p>
+        </div>
+
+        <div class="admin-stats" id="adminStats"></div>
+
+        <div class="admin-toolbar">
+          <div class="chips" id="adminFilters"></div>
+          <div class="search-box">
+            <svg class="ic" aria-hidden="true"><use href="#i-search"/></svg>
+            <input type="search" id="adminSearch" placeholder="Search name, email, phone or UTR" aria-label="Search registrations">
+          </div>
+        </div>
+
+        <div class="review-list" id="reviewList"></div>
+
+        <div class="admin-manager hidden" id="adminManager">
+          <div class="am-head">
+            <div>
+              <span class="eyebrow">Superadmin</span>
+              <h3>Admin Team</h3>
+              <p>Admins can verify payments. Only you can add or remove them.</p>
+            </div>
+          </div>
+          <ul class="admin-list" id="adminList"></ul>
+          <form class="add-admin" id="addAdminForm" novalidate>
+            <input type="email" id="newAdminEmail" placeholder="Google account email, e.g. name@gmail.com" aria-label="New admin email">
+            <button type="submit" class="btn btn-primary">Make admin</button>
+          </form>
+          <small class="error-msg" id="addAdminError" aria-live="polite"></small>
+        </div>
       </div>
     </section>
   </main>
@@ -246,43 +356,78 @@
   <footer class="footer">
     <div class="container footer-inner">
       <div>
-        <a href="#home" class="logo"><span class="logo-icon">◉</span><span class="logo-text">Event<span>Sphere</span></span></a>
-        <p>Your gateway to unforgettable experiences.</p>
+        <a href="#home" class="logo"><span class="logo-mark" aria-hidden="true">E</span><span class="logo-text">Eveora</span></a>
+        <p class="tagline">Where moments come alive.</p>
       </div>
       <div class="footer-links">
         <a href="#featured">Featured</a>
         <a href="#events">Events</a>
-        <a href="#register">Register</a>
+        <a href="#register">Reserve</a>
         <a href="#my-registrations">My Bookings</a>
         <a href="privacy.html">Privacy</a>
         <a href="terms.html">Terms</a>
       </div>
-      <p class="copy">© <span id="year"></span> EventSphere · Built with HTML, CSS & JavaScript</p>
+      <p class="copy">© <span id="year"></span> Eveora · Crafted with HTML, CSS &amp; JavaScript</p>
     </div>
   </footer>
 
-  <!-- ========== EVENT DETAIL MODAL ========== -->
+  <!-- ========== MODALS ========== -->
   <div class="modal" id="eventModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden>
     <div class="modal-backdrop" data-close></div>
     <div class="modal-dialog">
-      <button class="modal-close" data-close aria-label="Close">×</button>
+      <button class="modal-close" data-close aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button>
       <div id="modalBody"></div>
     </div>
   </div>
 
-  <!-- ========== SUCCESS MODAL ========== -->
   <div class="modal" id="successModal" role="dialog" aria-modal="true" aria-labelledby="successTitle" hidden>
     <div class="modal-backdrop" data-close></div>
     <div class="modal-dialog modal-sm">
-      <button class="modal-close" data-close aria-label="Close">×</button>
+      <button class="modal-close" data-close aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button>
       <div class="success-body" id="successBody"></div>
     </div>
   </div>
 
+  <div class="modal" id="ticketModal" role="dialog" aria-modal="true" aria-labelledby="ticketTitle" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-dialog modal-ticket">
+      <button class="modal-close" data-close aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button>
+      <div id="ticketBody"></div>
+    </div>
+  </div>
+
+  <div class="modal" id="proofModal" role="dialog" aria-modal="true" aria-labelledby="proofTitle" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-dialog">
+      <button class="modal-close" data-close aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button>
+      <div class="proof-body" id="proofBody"></div>
+    </div>
+  </div>
+
+  <div class="modal" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle" hidden>
+    <div class="modal-backdrop" data-close></div>
+    <div class="modal-dialog modal-sm">
+      <div class="confirm-body">
+        <h3 id="confirmTitle"></h3>
+        <p id="confirmText"></p>
+        <textarea id="confirmInput" rows="3" maxlength="200" hidden></textarea>
+        <small class="error-msg" id="confirmError"></small>
+        <div class="confirm-actions">
+          <button class="btn btn-outline" data-close>Cancel</button>
+          <button class="btn btn-primary" id="confirmOk">Confirm</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <button class="back-to-top" id="backToTop" aria-label="Back to top">↑</button>
+  <button class="back-to-top" id="backToTop" aria-label="Back to top"><svg class="ic"><use href="#i-arrow"/></svg></button>
 
   <script src="js/config.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="js/data.js"></script>
   <script src="js/app.js"></script>

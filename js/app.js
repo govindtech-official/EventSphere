@@ -1,8 +1,8 @@
 /* =========================================================
-   EventSphere – Application logic
-   Sections: storage · helpers · theme · navbar · rendering ·
-             filters · modal · countdown · form validation ·
-             bookings · scroll effects · init
+   Eveora – Application logic
+   Sections: helpers · theme · firebase & auth · navbar · rendering ·
+             filters · modals · countdown · payment · form validation ·
+             bookings & tickets · admin · scroll effects · init
    ========================================================= */
 
 (function () {
@@ -11,68 +11,68 @@
   const $ = (sel, ctx = document) => ctx.querySelector(sel);
   const $$ = (sel, ctx = document) => [...ctx.querySelectorAll(sel)];
 
-  const STORAGE_KEY = 'es-registrations';
-  const THEME_KEY = 'es-theme';
-  const USER_KEY = 'es-user';
+  const THEME_KEY = 'eveora-theme';
+  const CONFIG = window.ES_CONFIG || {};
+  const SUPERADMIN = (CONFIG.SUPERADMIN_EMAIL || '').toLowerCase();
+  const PAYMENT = CONFIG.PAYMENT || {};
 
-  const state = {
-    category: 'All',
-    search: '',
-    sort: 'date'
+  // Local Firebase emulators: open http://localhost:<port>/?emulator
+  const USE_EMULATOR = ['localhost', '127.0.0.1'].includes(location.hostname) &&
+    new URLSearchParams(location.search).has('emulator');
+
+  const STATUS = {
+    pending: { label: 'Under verification', short: 'Pending', icon: 'hourglass' },
+    approved: { label: 'Confirmed', short: 'Approved', icon: 'check' },
+    rejected: { label: 'Rejected', short: 'Rejected', icon: 'x' },
+    cancelled: { label: 'Cancelled', short: 'Cancelled', icon: 'x' }
   };
 
-  /* ---------- Local Storage (wrapped: storage may be blocked) ---------- */
-  const store = {
-    get(key, fallback) {
-      try {
-        const raw = localStorage.getItem(key);
-        return raw ? JSON.parse(raw) : fallback;
-      } catch (e) {
-        return fallback;
-      }
-    },
-    set(key, value) {
-      try {
-        localStorage.setItem(key, JSON.stringify(value));
-      } catch (e) { /* ignore – app still works for this session */ }
-    }
-  };
+  const state = { category: 'All', search: '', sort: 'date', adminFilter: 'pending', adminSearch: '' };
 
-  let registrations = store.get(STORAGE_KEY, []);
-  let currentUser = store.get(USER_KEY, null);
-
-  const myRegistrations = () => (currentUser
-    ? registrations.filter((r) => r.email === currentUser.email)
-    : []);
+  // Live data (from Firestore)
+  const fb = { auth: null, db: null };
+  let currentUser = null;            // { uid, name, email, picture }
+  const roles = { admin: false, superadmin: false };
+  let myRegs = [];                   // this user's registrations
+  let adminRegs = [];                // every registration (admins only)
+  let adminList = [];                // admins (superadmin only)
+  let booked = {};                   // eventId -> approved tickets
+  let proofData = null;              // compressed payment screenshot (data URL)
+  let authResolved = false;
+  const subs = {};                   // active Firestore listeners
 
   /* ---------- Helpers ---------- */
-  const escapeHTML = (str) => String(str).replace(/[&<>"']/g, (c) => (
+  const escapeHTML = (str) => String(str ?? '').replace(/[&<>"']/g, (c) => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
   ));
 
-  const formatPrice = (p) => (p === 0 ? 'Free' : '₹' + p.toLocaleString('en-IN'));
+  const ic = (name, cls = '') => `<svg class="ic ${cls}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
+
+  const rupees = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
+  const formatPrice = (p) => (p === 0 ? 'Complimentary' : rupees(p));
 
   const formatDate = (iso, opts) => new Date(iso).toLocaleDateString('en-IN', opts || {
     weekday: 'short', day: 'numeric', month: 'short', year: 'numeric'
   });
-
   const formatTime = (iso) => new Date(iso).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
 
+  const tsDate = (ts) => (ts && ts.toDate ? ts.toDate() : null);
+  const tsMillis = (ts) => (ts && ts.toMillis ? ts.toMillis() : Date.now());
+  const formatStamp = (ts) => {
+    const d = tsDate(ts);
+    return d ? d.toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }) : 'just now';
+  };
+
   const getEvent = (id) => EVENTS.find((e) => e.id === id);
-
-  const bookedSeats = (id) => registrations
-    .filter((r) => r.eventId === id)
-    .reduce((sum, r) => sum + r.tickets, 0);
-
-  const seatsLeft = (ev) => Math.max(ev.seats - bookedSeats(ev.id), 0);
-
+  const seatsLeft = (ev) => Math.max(ev.seats - (booked[ev.id] || 0), 0);
   const isPast = (ev) => new Date(ev.date) < new Date();
+  const firstName = (name) => String(name || '').split(' ')[0];
 
-  // Image with emoji/gradient fallback if the remote image fails to load
+  // Image with an elegant initial-letter fallback if the remote image fails
   const imageHTML = (ev, extra = '') => `
     <div class="img-wrap ${extra}">
-      <span class="fallback" aria-hidden="true">${ev.emoji}</span>
-      <img src="${ev.image}" alt="${escapeHTML(ev.name)}" loading="lazy" onerror="this.classList.add('failed')">
+      <span class="fallback" aria-hidden="true">${escapeHTML((ev.name || 'E').charAt(0))}</span>
+      ${ev.image ? `<img src="${ev.image}" alt="${escapeHTML(ev.name)}" loading="lazy" onerror="this.classList.add('failed')">` : ''}
     </div>`;
 
   let toastTimer;
@@ -81,7 +81,13 @@
     el.textContent = msg;
     el.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text).then(() => toast('Copied to clipboard'), () => toast('Copy failed'));
+    }
   }
 
   /* ---------- Theme (dark / light) ---------- */
@@ -90,12 +96,11 @@
       const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
       document.documentElement.setAttribute('data-theme', next);
       try { localStorage.setItem(THEME_KEY, next); } catch (e) { /* ignore */ }
-      toast(next === 'dark' ? '🌙 Dark mode on' : '☀️ Light mode on');
-      renderGoogleButtons(); // match Google's button theme
+      renderGoogleButtons();
     });
   }
 
-  /* ---------- Auth: Google Sign-In (the only login method) ---------- */
+  /* ---------- Firebase & Google Sign-In ---------- */
   const GOOGLE_ICON = `<svg viewBox="0 0 48 48" aria-hidden="true">
     <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
     <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
@@ -103,45 +108,147 @@
     <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
   </svg>`;
 
-  const clientId = () => (window.ES_CONFIG && window.ES_CONFIG.GOOGLE_CLIENT_ID) || '';
-  const isConfigured = () => /\.apps\.googleusercontent\.com$/.test(clientId()) && !clientId().startsWith('YOUR_');
+  const clientId = () => CONFIG.GOOGLE_CLIENT_ID || '';
+  const gisConfigured = () => /\.apps\.googleusercontent\.com$/.test(clientId()) && !clientId().startsWith('YOUR_');
   const googleReady = () => !!(window.google && google.accounts && google.accounts.id);
+  const firebaseReady = () => !!fb.auth;
   let googleInitialised = false;
+  let oneTapShown = false;
 
-  // Decode the payload of Google's ID token (JWT) – handles UTF-8 names
-  function decodeJwt(token) {
-    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-    const json = decodeURIComponent(atob(base64).split('')
-      .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
-    return JSON.parse(json);
-  }
-
-  function handleCredential(response) {
+  function initFirebase() {
+    if (!window.firebase) return false;
+    const cfg = USE_EMULATOR
+      ? { apiKey: 'demo-key', authDomain: 'localhost', projectId: 'demo-eveora' }
+      : (CONFIG.FIREBASE || {});
+    if (!cfg.apiKey || !cfg.projectId) return false;
     try {
-      const p = decodeJwt(response.credential);
-      if (p.aud !== clientId() || p.exp * 1000 < Date.now()) throw new Error('Invalid token');
-      if (!p.email_verified) { toast('⚠️ Please use a verified Google account'); return; }
-      setUser({ name: p.name || p.email.split('@')[0], email: p.email.toLowerCase(), picture: p.picture || '', sub: p.sub });
-      toast(`👋 Welcome, ${currentUser.name.split(' ')[0]}!`);
+      firebase.initializeApp(cfg);
+      fb.auth = firebase.auth();
+      fb.db = firebase.firestore();
+      if (USE_EMULATOR) {
+        fb.auth.useEmulator('http://127.0.0.1:9099', { disableWarnings: true });
+        fb.db.useEmulator('127.0.0.1', 8181);
+        window.__eveora = { auth: fb.auth, db: fb.db }; // for local testing only
+      }
+      return true;
     } catch (e) {
-      toast('⚠️ Google sign-in failed. Please try again.');
+      console.error('[Eveora] Firebase init failed', e);
+      return false;
     }
   }
 
-  function setUser(user) {
-    currentUser = user;
-    if (user) store.set(USER_KEY, user);
-    else { try { localStorage.removeItem(USER_KEY); } catch (e) { /* ignore */ } }
-    renderAuth();
-    refreshAll();
+  const backendMissing = () => toast('The booking service is not configured yet.');
+
+  function handleCredential(response) {
+    if (!firebaseReady()) { backendMissing(); return; }
+    const credential = firebase.auth.GoogleAuthProvider.credential(response.credential);
+    fb.auth.signInWithCredential(credential)
+      .then((res) => toast(`Welcome, ${firstName(res.user.displayName) || 'guest'}.`))
+      .catch((err) => {
+        console.error('[Eveora] Sign-in failed', err);
+        toast('Google sign-in failed. Please try again.');
+      });
+  }
+
+  function popupSignIn() {
+    if (!firebaseReady()) { backendMissing(); return; }
+    fb.auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())
+      .then((res) => toast(`Welcome, ${firstName(res.user.displayName) || 'guest'}.`))
+      .catch((err) => {
+        if (!['auth/popup-closed-by-user', 'auth/cancelled-popup-request'].includes(err.code)) {
+          console.error('[Eveora] Sign-in failed', err);
+          toast('Google sign-in failed. Please try again.');
+        }
+      });
   }
 
   function signOut() {
     if (googleReady()) google.accounts.id.disableAutoSelect();
-    setUser(null);
-    toast('Signed out');
+    if (fb.auth) fb.auth.signOut().then(() => toast('You have been signed out.'));
   }
 
+  function onAuthChanged(user) {
+    authResolved = true;
+    ['myRegs', 'role', 'adminRegs', 'admins'].forEach(unlisten);
+    myRegs = []; adminRegs = []; adminList = [];
+    roles.admin = roles.superadmin = false;
+    state.adminFilter = 'pending';
+    state.adminSearch = '';
+    $('#adminSearch').value = '';
+
+    if (user) {
+      const email = (user.email || '').toLowerCase();
+      currentUser = { uid: user.uid, name: user.displayName || email.split('@')[0], email, picture: user.photoURL || '' };
+      roles.superadmin = !!SUPERADMIN && email === SUPERADMIN && user.emailVerified;
+      roles.admin = roles.superadmin;
+      listenMyRegistrations();
+      if (roles.superadmin) startAdminListeners();
+      else listenRole();
+    } else {
+      currentUser = null;
+      maybePromptOneTap();
+    }
+    renderAuth();
+    refreshAll();
+  }
+
+  /* ---------- Firestore listeners ---------- */
+  function listen(key, ref, onData) {
+    unlisten(key);
+    subs[key] = ref.onSnapshot(onData, (err) => console.error(`[Eveora] ${key} listener`, err));
+  }
+  function unlisten(key) {
+    if (subs[key]) { subs[key](); delete subs[key]; }
+  }
+  const docData = (d) => ({ id: d.id, ...d.data() });
+  const byNewest = (a, b) => tsMillis(b.createdAt) - tsMillis(a.createdAt);
+
+  function listenMyRegistrations() {
+    listen('myRegs', fb.db.collection('registrations').where('uid', '==', currentUser.uid), (snap) => {
+      myRegs = snap.docs.map(docData).sort(byNewest);
+      renderBookings();
+      populateEventSelect();
+    });
+  }
+
+  // Non-superadmins become admins when the superadmin adds their email
+  function listenRole() {
+    listen('role', fb.db.collection('admins').doc(currentUser.email), (doc) => {
+      const was = roles.admin;
+      roles.admin = doc.exists;
+      if (roles.admin && !was) { startAdminListeners(); toast('You now have admin access.'); }
+      if (!roles.admin && was) { unlisten('adminRegs'); adminRegs = []; }
+      renderAuth();
+      renderAdmin();
+    });
+  }
+
+  function startAdminListeners() {
+    listen('adminRegs', fb.db.collection('registrations').orderBy('createdAt', 'desc').limit(300), (snap) => {
+      adminRegs = snap.docs.map(docData);
+      renderAdmin();
+    });
+    if (roles.superadmin) {
+      listen('admins', fb.db.collection('admins'), (snap) => {
+        adminList = snap.docs.map((d) => d.data()).sort((a, b) => a.email.localeCompare(b.email));
+        renderAdminManager();
+      });
+    }
+  }
+
+  function listenStats() {
+    listen('stats', fb.db.collection('eventStats'), (snap) => {
+      booked = {};
+      snap.forEach((d) => { booked[d.id] = d.data().booked || 0; });
+      renderFeatured();
+      renderEvents();
+      populateEventSelect();
+      updateFormSummary();
+      renderAdmin();
+    });
+  }
+
+  /* ---------- Auth UI ---------- */
   const avatarHTML = (u) => {
     const initial = escapeHTML((u.name || '?').trim().charAt(0).toUpperCase());
     return u.picture
@@ -183,9 +290,13 @@
     if (signedIn) {
       $('#userAvatar').innerHTML = avatarHTML(currentUser);
       $('#ddAvatar').innerHTML = avatarHTML(currentUser);
-      $('#userName').textContent = currentUser.name.split(' ')[0];
+      $('#userName').textContent = firstName(currentUser.name);
       $('#ddName').textContent = currentUser.name;
       $('#ddEmail').textContent = currentUser.email;
+      const role = roles.superadmin ? 'Superadmin' : roles.admin ? 'Admin' : '';
+      $('#userRole').textContent = role;
+      $('#userRole').classList.toggle('hidden', !role);
+      $('#ddAdmin').classList.toggle('hidden', !roles.admin);
     }
     prefillUser();
   }
@@ -197,8 +308,15 @@
     f.email.value = currentUser ? currentUser.email : '';
   }
 
+  function maybePromptOneTap() {
+    if (googleInitialised && authResolved && !currentUser && !oneTapShown) {
+      oneTapShown = true;
+      google.accounts.id.prompt();
+    }
+  }
+
   function initGoogle() {
-    if (googleInitialised || !isConfigured() || !googleReady()) return;
+    if (googleInitialised || !gisConfigured() || !googleReady() || !firebaseReady() || USE_EMULATOR) return;
     google.accounts.id.initialize({
       client_id: clientId(),
       callback: handleCredential,
@@ -208,22 +326,18 @@
     });
     googleInitialised = true;
     renderGoogleButtons();
-    if (!currentUser) google.accounts.id.prompt(); // One Tap
+    maybePromptOneTap();
   }
 
   function initAuth() {
     renderGoogleButtons();
     renderAuth();
 
-    // Clicks on the fallback button (Google library not loaded / not configured)
+    // The styled fallback button signs in through a Firebase popup
     document.addEventListener('click', (e) => {
-      if (!e.target.closest('.g-fallback')) return;
-      if (!isConfigured()) toast('⚙️ Add your Google Client ID in js/config.js to enable sign-in');
-      else if (!googleReady()) toast('⏳ Google Sign-In is still loading…');
-      else { initGoogle(); google.accounts.id.prompt(); }
+      if (e.target.closest('.g-fallback')) popupSignIn();
     });
 
-    // Profile dropdown
     const chip = $('#userChip');
     const dd = $('#userDropdown');
     chip.addEventListener('click', (e) => {
@@ -264,11 +378,9 @@
       hamburger.classList.toggle('open', open);
       hamburger.setAttribute('aria-expanded', String(open));
     });
-
     $$('a', links).forEach((a) => a.addEventListener('click', closeMenu));
 
     // Highlight the nav link for the section in view
-    const sections = $$('main section[id]');
     const spy = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
@@ -276,7 +388,7 @@
         }
       });
     }, { rootMargin: '-45% 0px -50% 0px' });
-    sections.forEach((s) => spy.observe(s));
+    $$('main section[id]').forEach((s) => spy.observe(s));
   }
 
   /* ---------- Event cards ---------- */
@@ -287,33 +399,32 @@
     const low = left <= ev.seats * 0.15;
 
     return `
-      <article class="event-card" data-id="${ev.id}" tabindex="0" style="animation-delay:${index * 60}ms"
+      <article class="event-card" data-id="${ev.id}" tabindex="0" style="animation-delay:${index * 70}ms"
                aria-label="${escapeHTML(ev.name)}, ${formatDate(ev.date)}">
-        <div style="position:relative">
-          <span class="tag">${CATEGORY_ICONS[ev.category] || ''} ${ev.category}</span>
+        <div class="media">
+          <span class="tag">${escapeHTML(ev.category)}</span>
           <div class="date-badge"><strong>${d.getDate()}</strong><span>${d.toLocaleString('en-IN', { month: 'short' })}</span></div>
           ${imageHTML(ev)}
         </div>
         <div class="card-body">
           <h3>${escapeHTML(ev.name)}</h3>
           <div class="card-meta">
-            <span>📅 ${formatDate(ev.date)} · ${formatTime(ev.date)}</span>
-            <span>📍 ${escapeHTML(ev.venue)}, ${escapeHTML(ev.city)}</span>
+            <span>${ic('calendar')} ${formatDate(ev.date)} · ${formatTime(ev.date)}</span>
+            <span>${ic('pin')} ${escapeHTML(ev.venue)}, ${escapeHTML(ev.city)}</span>
           </div>
           <p class="card-desc">${escapeHTML(ev.description)}</p>
           <div class="seats-bar" aria-hidden="true"><span style="width:${pct}%"></span></div>
-          <p class="seats-text ${low ? 'low' : ''}">${left === 0 ? 'Sold out' : `${left} of ${ev.seats} seats left`}</p>
+          <p class="seats-text ${low ? 'low' : ''}">${left === 0 ? 'Fully booked' : `${left} of ${ev.seats} seats available`}</p>
           <div class="card-foot">
-            <span class="price">${formatPrice(ev.price)} ${ev.price ? '<small>/ person</small>' : ''}</span>
-            <button class="btn btn-primary" data-action="details">View Details</button>
+            <span class="price">${formatPrice(ev.price)} ${ev.price ? '<small>/ guest</small>' : ''}</span>
+            <button class="btn btn-outline btn-sm" data-action="details">Discover</button>
           </div>
         </div>
       </article>`;
   }
 
   function renderFeatured() {
-    const featured = EVENTS.filter((e) => e.featured && !isPast(e))
-      .sort((a, b) => new Date(a.date) - new Date(b.date));
+    const featured = EVENTS.filter((e) => e.featured && !isPast(e)).sort((a, b) => new Date(a.date) - new Date(b.date));
     $('#featuredTrack').innerHTML = featured.map(cardHTML).join('');
   }
 
@@ -323,11 +434,11 @@
     if (!next) { el.classList.add('hidden'); return; }
 
     el.innerHTML = `
-      <div class="hc-img">${imageHTML(next, '')}</div>
+      <div class="hc-img">${imageHTML(next)}</div>
       <div class="hc-body">
-        <span class="hc-label">⏳ Next up</span>
+        <span class="hc-label">Next on the calendar</span>
         <h3>${escapeHTML(next.name)}</h3>
-        <p class="meta">📍 ${escapeHTML(next.venue)}, ${escapeHTML(next.city)}</p>
+        <p class="meta">${ic('pin')} ${escapeHTML(next.venue)}, ${escapeHTML(next.city)}</p>
         <div class="countdown" data-countdown="${next.date}"></div>
         <button class="btn btn-primary btn-block" data-open="${next.id}">View Event</button>
       </div>`;
@@ -340,7 +451,7 @@
     const cats = ['All', ...new Set(EVENTS.map((e) => e.category))];
     $('#categoryChips').innerHTML = cats.map((c) => `
       <button class="chip ${c === state.category ? 'active' : ''}" role="tab"
-              aria-selected="${c === state.category}" data-cat="${c}">${CATEGORY_ICONS[c] || ''} ${c}</button>`).join('');
+              aria-selected="${c === state.category}" data-cat="${c}">${c}</button>`).join('');
   }
 
   function filteredEvents() {
@@ -350,7 +461,6 @@
       const haystack = `${e.name} ${e.venue} ${e.city} ${e.category} ${e.description}`.toLowerCase();
       return matchCat && (!q || haystack.includes(q));
     });
-
     const sorters = {
       date: (a, b) => new Date(a.date) - new Date(b.date),
       'price-low': (a, b) => a.price - b.price,
@@ -373,17 +483,9 @@
     let debounce;
     $('#searchInput').addEventListener('input', (e) => {
       clearTimeout(debounce);
-      debounce = setTimeout(() => {
-        state.search = e.target.value;
-        renderEvents();
-      }, 200);
+      debounce = setTimeout(() => { state.search = e.target.value; renderEvents(); }, 200);
     });
-
-    $('#sortSelect').addEventListener('change', (e) => {
-      state.sort = e.target.value;
-      renderEvents();
-    });
-
+    $('#sortSelect').addEventListener('change', (e) => { state.sort = e.target.value; renderEvents(); });
     $('#categoryChips').addEventListener('click', (e) => {
       const chip = e.target.closest('.chip');
       if (!chip) return;
@@ -391,7 +493,6 @@
       renderChips();
       renderEvents();
     });
-
     $('#resetFilters').addEventListener('click', () => {
       state.category = 'All';
       state.search = '';
@@ -399,8 +500,6 @@
       renderChips();
       renderEvents();
     });
-
-    // Hero search jumps to the events section with the query applied
     $('#heroSearch').addEventListener('submit', (e) => {
       e.preventDefault();
       const q = $('#heroSearchInput').value;
@@ -410,7 +509,6 @@
       $('#events').scrollIntoView({ behavior: 'smooth' });
     });
 
-    // Featured slider arrows
     const track = $('#featuredTrack');
     const step = () => track.clientWidth * 0.9;
     $('#featPrev').addEventListener('click', () => track.scrollBy({ left: -step() }));
@@ -419,19 +517,42 @@
 
   /* ---------- Modals ---------- */
   let lastFocus = null;
+  let confirmResolve = null;
 
   function openModal(modal) {
     lastFocus = document.activeElement;
     modal.hidden = false;
     document.body.classList.add('no-scroll');
-    const close = $('.modal-close', modal);
-    if (close) close.focus();
+    const focusable = $('.modal-close', modal) || $('button', modal);
+    if (focusable) focusable.focus({ preventScroll: true });
   }
 
   function closeModal(modal) {
+    if (modal.hidden) return;
     modal.hidden = true;
+    if (modal.id === 'confirmModal' && confirmResolve) { const r = confirmResolve; confirmResolve = null; r(false); }
     if (!$$('.modal').some((m) => !m.hidden)) document.body.classList.remove('no-scroll');
     if (lastFocus) lastFocus.focus({ preventScroll: true });
+  }
+
+  // Styled replacement for confirm()/prompt(). Resolves with the text entered ('' if none) or false.
+  function askConfirm({ title, text, okLabel = 'Confirm', danger = false, input = null }) {
+    return new Promise((resolve) => {
+      $('#confirmTitle').textContent = title;
+      $('#confirmText').textContent = text;
+      const field = $('#confirmInput');
+      field.hidden = !input;
+      field.value = '';
+      field.placeholder = input ? input.placeholder || '' : '';
+      $('#confirmError').textContent = '';
+      const ok = $('#confirmOk');
+      ok.textContent = okLabel;
+      ok.classList.toggle('btn-danger', danger);
+      ok.classList.toggle('btn-primary', !danger);
+      confirmResolve = resolve;
+      openModal($('#confirmModal'));
+      if (input) setTimeout(() => field.focus(), 60);
+    });
   }
 
   function showEventDetails(id) {
@@ -440,33 +561,33 @@
     const left = seatsLeft(ev);
 
     $('#modalBody').innerHTML = `
-      <div class="modal-hero">${imageHTML(ev, '')}</div>
+      <div class="modal-hero">${imageHTML(ev)}</div>
       <div class="modal-content">
-        <span class="cat-label">${CATEGORY_ICONS[ev.category] || ''} ${ev.category}</span>
+        <span class="eyebrow">${escapeHTML(ev.category)}</span>
         <h2 id="modalTitle">${escapeHTML(ev.name)}</h2>
 
         <div class="info-grid">
-          <div class="info-item"><span class="ic">📅</span><div><small>Date</small><strong>${formatDate(ev.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong></div></div>
-          <div class="info-item"><span class="ic">⏰</span><div><small>Time</small><strong>${formatTime(ev.date)}</strong></div></div>
-          <div class="info-item"><span class="ic">📍</span><div><small>Venue</small><strong>${escapeHTML(ev.venue)}, ${escapeHTML(ev.city)}</strong></div></div>
-          <div class="info-item"><span class="ic">🎟️</span><div><small>Seats left</small><strong>${left} / ${ev.seats}</strong></div></div>
-          <div class="info-item"><span class="ic">💰</span><div><small>Price</small><strong>${formatPrice(ev.price)}</strong></div></div>
-          <div class="info-item"><span class="ic">🏢</span><div><small>Organizer</small><strong>${escapeHTML(ev.organizer)}</strong></div></div>
+          <div class="info-item">${ic('calendar')}<div><small>Date</small><strong>${formatDate(ev.date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong></div></div>
+          <div class="info-item">${ic('clock')}<div><small>Time</small><strong>${formatTime(ev.date)}</strong></div></div>
+          <div class="info-item">${ic('pin')}<div><small>Venue</small><strong>${escapeHTML(ev.venue)}, ${escapeHTML(ev.city)}</strong></div></div>
+          <div class="info-item">${ic('ticket')}<div><small>Seats available</small><strong>${left} of ${ev.seats}</strong></div></div>
+          <div class="info-item">${ic('sparkle')}<div><small>Price</small><strong>${formatPrice(ev.price)}${ev.price ? ' per guest' : ''}</strong></div></div>
+          <div class="info-item">${ic('building')}<div><small>Hosted by</small><strong>${escapeHTML(ev.organizer)}</strong></div></div>
         </div>
 
-        <h4>Event starts in</h4>
+        <h4>Begins in</h4>
         <div class="countdown" data-countdown="${ev.date}"></div>
 
-        <h4>About this event</h4>
+        <h4>About the experience</h4>
         <p>${escapeHTML(ev.description)}</p>
 
         <h4>Highlights</h4>
         <ul class="highlights">${ev.highlights.map((h) => `<li>${escapeHTML(h)}</li>`).join('')}</ul>
 
         <div class="modal-actions">
-          <span class="price">${formatPrice(ev.price)} ${ev.price ? '<small>/ person</small>' : ''}</span>
+          <span class="price">${formatPrice(ev.price)} ${ev.price ? '<small>/ guest</small>' : ''}</span>
           <button class="btn btn-primary" data-register="${ev.id}" ${left === 0 || isPast(ev) ? 'disabled' : ''}>
-            ${left === 0 ? 'Sold Out' : isPast(ev) ? 'Event ended' : 'Register Now →'}
+            ${left === 0 ? 'Fully booked' : isPast(ev) ? 'Event ended' : 'Reserve now'}
           </button>
         </div>
       </div>`;
@@ -477,7 +598,6 @@
   }
 
   function initModals() {
-    // Open details from any card / hero button (event delegation)
     document.addEventListener('click', (e) => {
       const opener = e.target.closest('[data-open]');
       if (opener) { showEventDetails(opener.dataset.open); return; }
@@ -490,11 +610,20 @@
         closeModal($('#eventModal'));
         selectEventInForm(reg.dataset.register);
         $('#register').scrollIntoView({ behavior: 'smooth' });
-        setTimeout(() => $('#fullName').focus({ preventScroll: true }), 600);
+        if (currentUser) setTimeout(() => $('#phone').focus({ preventScroll: true }), 700);
+        return;
       }
+
+      const proof = e.target.closest('[data-proof]');
+      if (proof) { showProof(proof.dataset.proof); return; }
+
+      const ticket = e.target.closest('[data-ticket]');
+      if (ticket) { showTicket(ticket.dataset.ticket); return; }
+
+      const copy = e.target.closest('[data-copy]');
+      if (copy) copyText(copy.dataset.copy);
     });
 
-    // Keyboard: Enter/Space on a focused card opens it
     document.addEventListener('keydown', (e) => {
       const card = e.target.closest && e.target.closest('.event-card');
       if (card && (e.key === 'Enter' || e.key === ' ') && e.target === card) {
@@ -509,6 +638,19 @@
         if (e.target.closest('[data-close]')) closeModal(modal);
       });
     });
+
+    $('#confirmOk').addEventListener('click', () => {
+      const field = $('#confirmInput');
+      if (!field.hidden && field.value.trim().length < 3) {
+        $('#confirmError').textContent = 'Please add a short reason.';
+        field.focus();
+        return;
+      }
+      const resolve = confirmResolve;
+      confirmResolve = null;
+      closeModal($('#confirmModal'));
+      if (resolve) resolve(field.hidden ? '' : field.value.trim());
+    });
   }
 
   /* ---------- Countdown timers ---------- */
@@ -516,7 +658,7 @@
     $$('[data-countdown]').forEach((el) => {
       const diff = new Date(el.dataset.countdown) - new Date();
       if (diff <= 0) {
-        el.innerHTML = '<div style="grid-column:1/-1"><strong>🎉 Live now / Ended</strong></div>';
+        el.innerHTML = '<div style="grid-column:1/-1"><strong>Now live</strong></div>';
         return;
       }
       const units = [
@@ -530,8 +672,119 @@
     });
   }
 
+  /* ---------- Payment ---------- */
+  const upiConfigured = () => /^[\w.-]{2,}@[a-zA-Z]{2,}$/.test(PAYMENT.UPI_ID || '');
+  const normaliseUtr = (v) => String(v || '').replace(/[\s-]/g, '').toUpperCase();
+  let lastQr = '';
+
+  function renderQr(box, text, size) {
+    box.innerHTML = '';
+    if (window.QRCode) new QRCode(box, { text, width: size, height: size, correctLevel: QRCode.CorrectLevel.M });
+    else box.innerHTML = '<div class="qr-placeholder">QR unavailable</div>';
+  }
+
+  function renderPayment(ev, qty) {
+    const amount = ev ? ev.price * qty : 0;
+    const paid = amount > 0;
+    $('#paymentBlock').classList.toggle('hidden', !paid);
+    $('#submitBtn .btn-label').textContent = paid ? 'Submit for Verification' : 'Confirm Reservation';
+    if (!paid) return;
+
+    $('#payAmount').textContent = rupees(amount);
+    const configured = upiConfigured();
+    $('#payDemoNote').classList.toggle('hidden', configured);
+    $('#upiRow').classList.toggle('hidden', !configured);
+    $('#upiLink').classList.toggle('hidden', !configured);
+
+    if (configured) {
+      const link = `upi://pay?pa=${encodeURIComponent(PAYMENT.UPI_ID)}&pn=${encodeURIComponent(PAYMENT.PAYEE_NAME || 'Eveora')}` +
+        `&am=${amount}&cu=INR&tn=${encodeURIComponent(('Eveora ' + ev.name).slice(0, 40))}`;
+      $('#upiId').textContent = PAYMENT.UPI_ID;
+      $('#copyUpi').dataset.copy = PAYMENT.UPI_ID;
+      $('#upiLink').href = link;
+      if (link !== lastQr) { lastQr = link; renderQr($('#payQr'), link, 168); }
+    } else {
+      lastQr = '';
+      $('#payQr').innerHTML = '<div class="qr-placeholder">The payment QR appears here once a UPI ID is configured.</div>';
+    }
+  }
+
+  // Shrink screenshots so they fit in a Firestore document (free plan, no file storage needed)
+  function compressImage(file, maxSide = 1600) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxSide / Math.max(img.width, img.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        let quality = 0.78;
+        let data = canvas.toDataURL('image/jpeg', quality);
+        while (data.length > 700000 && quality > 0.35) {
+          quality -= 0.1;
+          data = canvas.toDataURL('image/jpeg', quality);
+        }
+        if (data.length > 880000) reject(new Error('too-large'));
+        else resolve(data);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('unreadable')); };
+      img.src = url;
+    });
+  }
+
+  function setProofPreview(data) {
+    const img = $('#proofPreview');
+    const box = $('#uploadBox');
+    if (data) { img.src = data; img.hidden = false; box.classList.add('has-file'); }
+    else { img.removeAttribute('src'); img.hidden = true; box.classList.remove('has-file'); }
+  }
+
+  function initProofUpload() {
+    const input = $('#proof');
+    input.addEventListener('change', async () => {
+      const file = input.files && input.files[0];
+      proofData = null;
+      setProofPreview(null);
+      if (!file) { validateField(input); return; }
+      if (!/^image\/(png|jpe?g|webp)$/.test(file.type)) {
+        input.value = '';
+        setFieldState(input, 'Please upload a JPG, PNG or WebP image.');
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        input.value = '';
+        setFieldState(input, 'The image must be 10 MB or smaller.');
+        return;
+      }
+      $('#uploadBox').classList.add('busy');
+      try {
+        proofData = await compressImage(file);
+        setProofPreview(proofData);
+        validateField(input);
+      } catch (e) {
+        input.value = '';
+        setFieldState(input, 'That image could not be read. Please try another screenshot.');
+      } finally {
+        $('#uploadBox').classList.remove('busy');
+      }
+    });
+  }
+
   /* ---------- Registration form ---------- */
   const form = $('#registerForm');
+
+  const paymentRequired = () => {
+    const ev = getEvent(form.eventSelect.value);
+    return !!ev && ev.price > 0;
+  };
+
+  const activeBookingFor = (eventId) => myRegs.find((r) => r.eventId === eventId && ['pending', 'approved'].includes(r.status));
 
   const validators = {
     fullName(v) {
@@ -543,8 +796,8 @@
     },
     email(v) {
       v = v.trim();
-      if (!v) return 'Please enter your email address.';
-      if (!/^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(v)) return 'Please enter a valid email (e.g. you@example.com).';
+      if (!v) return 'Please sign in so we can use your email.';
+      if (!/^[^\s@]+@[^\s@]+\.[A-Za-z]{2,}$/.test(v)) return 'Please enter a valid email.';
       return '';
     },
     phone(v) {
@@ -554,33 +807,52 @@
       return '';
     },
     eventSelect(v) {
-      if (!v) return 'Please select an event.';
+      if (!v) return 'Please choose an event.';
       const ev = getEvent(v);
       if (!ev) return 'Selected event was not found.';
       if (isPast(ev)) return 'This event has already ended.';
-      if (seatsLeft(ev) === 0) return 'Sorry, this event is sold out.';
+      if (seatsLeft(ev) === 0) return 'Sorry, this event is fully booked.';
+      if (activeBookingFor(v)) return 'You already have a booking for this event.';
       return '';
     },
     tickets(v) {
       const n = Number(v);
       if (!Number.isInteger(n) || n < 1) return 'Select at least 1 ticket.';
-      if (n > 5) return 'You can book a maximum of 5 tickets.';
+      if (n > 5) return 'You can reserve up to 5 tickets.';
       const ev = getEvent(form.eventSelect.value);
-      if (ev && n > seatsLeft(ev)) return `Only ${seatsLeft(ev)} seat(s) left for this event.`;
+      if (ev && n > seatsLeft(ev)) return `Only ${seatsLeft(ev)} seat(s) remain for this event.`;
       return '';
     },
+    utr(v) {
+      if (!paymentRequired()) return '';
+      const u = normaliseUtr(v);
+      if (!u) return 'Please enter the UTR / UPI reference number.';
+      if (!/^[A-Z0-9]{12,22}$/.test(u)) return 'The UTR should be 12–22 letters or digits (UPI UTRs are 12 digits).';
+      if (myRegs.some((r) => r.utr === u && ['pending', 'approved'].includes(r.status))) return 'You have already used this UTR for another booking.';
+      return '';
+    },
+    proof() {
+      if (!paymentRequired()) return '';
+      return proofData ? '' : 'Please upload a screenshot of your payment.';
+    },
     terms(_, el) {
-      return el.checked ? '' : 'You must accept the terms to continue.';
+      return el.checked ? '' : 'Please accept the terms to continue.';
     }
   };
 
-  function validateField(el) {
+  function setFieldState(el, msg) {
     const group = el.closest('.form-group');
-    const msg = validators[el.name](el.value, el);
     group.classList.toggle('invalid', !!msg);
     group.classList.toggle('valid', !msg);
     $('.error-msg', group).textContent = msg;
     el.setAttribute('aria-invalid', String(!!msg));
+  }
+
+  function validateField(el) {
+    const fn = validators[el.name];
+    if (!fn) return true;
+    const msg = fn(el.value, el);
+    setFieldState(el, msg);
     return !msg;
   }
 
@@ -588,9 +860,9 @@
     const select = $('#eventSelect');
     const current = select.value;
     const upcoming = EVENTS.filter((e) => !isPast(e)).sort((a, b) => new Date(a.date) - new Date(b.date));
-    select.innerHTML = '<option value="">-- Choose an event --</option>' + upcoming.map((e) => {
+    select.innerHTML = '<option value="">Choose an event</option>' + upcoming.map((e) => {
       const left = seatsLeft(e);
-      return `<option value="${e.id}" ${left === 0 ? 'disabled' : ''}>${escapeHTML(e.name)} — ${formatDate(e.date, { day: 'numeric', month: 'short' })}${left === 0 ? ' (Sold out)' : ''}</option>`;
+      return `<option value="${e.id}" ${left === 0 ? 'disabled' : ''}>${escapeHTML(e.name)} — ${formatDate(e.date, { day: 'numeric', month: 'short' })}${left === 0 ? ' (Fully booked)' : ''}</option>`;
     }).join('');
     select.value = current;
   }
@@ -604,25 +876,33 @@
   function updateFormSummary() {
     const ev = getEvent($('#eventSelect').value);
     const qty = Math.max(parseInt($('#tickets').value, 10) || 0, 0);
-    $('#totalPrice').textContent = ev ? (ev.price ? formatPrice(ev.price * qty) : 'Free') : '₹0';
+    $('#totalPrice').textContent = ev ? (ev.price ? rupees(ev.price * qty) : 'Complimentary') : '₹0';
+    renderPayment(ev, qty || 1);
 
     $('#selectedPreview').innerHTML = ev ? `
       ${imageHTML(ev)}
       <div>
         <h4>${escapeHTML(ev.name)}</h4>
-        <p>📅 ${formatDate(ev.date)} · ${formatTime(ev.date)}</p>
-        <p>📍 ${escapeHTML(ev.city)} · ${seatsLeft(ev)} seats left</p>
+        <p>${ic('calendar')} ${formatDate(ev.date)} · ${formatTime(ev.date)}</p>
+        <p>${ic('pin')} ${escapeHTML(ev.city)} · ${seatsLeft(ev)} seats available</p>
       </div>` : '';
   }
 
-  const ticketId = () => 'ES-' + Date.now().toString(36).toUpperCase().slice(-5) +
-    Math.random().toString(36).slice(2, 5).toUpperCase();
+  function resetForm() {
+    form.reset();
+    proofData = null;
+    setProofPreview(null);
+    $$('.form-group', form).forEach((g) => g.classList.remove('valid', 'invalid'));
+    $$('.error-msg', form).forEach((m) => { m.textContent = ''; });
+    prefillUser();
+    updateFormSummary();
+  }
 
   function initForm() {
     const fields = $$('input, select', form);
 
     // Validate on blur; re-validate live once a field has shown an error
-    fields.forEach((el) => {
+    fields.filter((el) => el.type !== 'file').forEach((el) => {
       el.addEventListener('blur', () => validateField(el));
       el.addEventListener(el.type === 'checkbox' || el.tagName === 'SELECT' ? 'change' : 'input', () => {
         if (el.closest('.form-group').classList.contains('invalid')) validateField(el);
@@ -630,99 +910,119 @@
       });
     });
 
-    // Only allow phone characters
-    $('#phone').addEventListener('input', (e) => {
-      e.target.value = e.target.value.replace(/[^\d+\s-]/g, '');
-    });
+    $('#phone').addEventListener('input', (e) => { e.target.value = e.target.value.replace(/[^\d+\s-]/g, ''); });
+    $('#utr').addEventListener('input', (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9\s-]/g, ''); });
 
-    form.addEventListener('submit', (e) => {
+    form.addEventListener('submit', async (e) => {
       e.preventDefault();
       if (!currentUser) {
-        toast('🔐 Please sign in with Google to register');
+        toast('Please sign in with Google to reserve.');
         $('#register').scrollIntoView({ behavior: 'smooth' });
         return;
       }
+      if (!firebaseReady()) { backendMissing(); return; }
+
       form.email.value = currentUser.email;
       const allValid = fields.map(validateField).every(Boolean);
       if (!allValid) {
         const firstBad = $('.form-group.invalid input, .form-group.invalid select', form);
         if (firstBad) firstBad.focus();
-        toast('⚠️ Please fix the highlighted fields');
+        toast('Please review the highlighted fields.');
         return;
       }
 
-      const data = {
+      const ev = getEvent(form.eventSelect.value);
+      const tickets = Number(form.tickets.value);
+      const amount = ev.price * tickets;
+      const paid = amount > 0;
+      const utr = paid ? normaliseUtr(form.utr.value) : '';
+      const now = firebase.firestore.FieldValue.serverTimestamp();
+      const regRef = fb.db.collection('registrations').doc();
+
+      const record = {
+        uid: currentUser.uid,
         name: form.fullName.value.trim(),
         email: currentUser.email,
-        userId: currentUser.sub,
         phone: form.phone.value.replace(/[\s-]/g, '').replace(/^\+91/, ''),
-        eventId: form.eventSelect.value,
-        tickets: Number(form.tickets.value)
+        eventId: ev.id,
+        eventName: ev.name,
+        eventDate: ev.date,
+        tickets,
+        price: ev.price,
+        amount,
+        utr,
+        hasProof: paid,
+        status: 'pending',
+        createdAt: now
       };
 
-      // Prevent the same email registering twice for one event
-      if (registrations.some((r) => r.eventId === data.eventId && r.email === data.email)) {
-        const group = form.eventSelect.closest('.form-group');
-        group.classList.add('invalid');
-        $('.error-msg', group).textContent = 'You are already registered for this event.';
-        form.eventSelect.focus();
-        return;
+      const batch = fb.db.batch();
+      batch.set(regRef, record);
+      if (paid) {
+        batch.set(fb.db.collection('paymentProofs').doc(regRef.id), { uid: currentUser.uid, regId: regRef.id, image: proofData, createdAt: now });
+        batch.set(fb.db.collection('utrs').doc(utr), { uid: currentUser.uid, regId: regRef.id, createdAt: now });
       }
 
       const btn = $('#submitBtn');
       btn.classList.add('loading');
       btn.disabled = true;
-
-      // Simulated network delay for a realistic feel
-      setTimeout(() => {
-        const ev = getEvent(data.eventId);
-        const record = { ...data, id: ticketId(), total: ev.price * data.tickets, createdAt: new Date().toISOString() };
-        registrations.unshift(record);
-        store.set(STORAGE_KEY, registrations);
-
+      try {
+        await batch.commit();
+        resetForm();
+        showSuccess(record, ev);
+      } catch (err) {
+        console.error('[Eveora] Registration failed', err);
+        if (paid && err.code === 'permission-denied') {
+          setFieldState(form.utr, 'This UTR has already been submitted. Please check the number.');
+          form.utr.focus();
+        }
+        toast('Your reservation could not be submitted. Please try again.');
+      } finally {
         btn.classList.remove('loading');
         btn.disabled = false;
-        form.reset();
-        $$('.form-group', form).forEach((g) => g.classList.remove('valid', 'invalid'));
-        prefillUser();
-        updateFormSummary();
-        refreshAll();
-        showSuccess(record, ev);
-      }, 900);
+      }
     });
   }
 
   function showSuccess(r, ev) {
+    const paid = r.amount > 0;
     $('#successBody').innerHTML = `
-      <div class="check-circle">✓</div>
-      <h3 id="successTitle">Registration Confirmed!</h3>
-      <p>Thank you, <strong>${escapeHTML(r.name.split(' ')[0])}</strong>! Your spot is reserved.
-         A confirmation would be sent to <strong>${escapeHTML(r.email)}</strong>.</p>
-      <div class="ticket">
-        <div><span>Ticket ID</span><strong>${r.id}</strong></div>
+      <div class="seal">${ic('hourglass')}</div>
+      <h3 id="successTitle">${paid ? 'Payment received for review' : 'Reservation received'}</h3>
+      <p>Thank you, <strong>${escapeHTML(firstName(r.name))}</strong>. ${paid
+        ? 'Our team will match your UTR and screenshot with our records.'
+        : 'Our team will confirm your place shortly.'}
+        Your ticket will appear in <strong>My Bookings</strong> as soon as it's approved.</p>
+      <div class="summary">
         <div><span>Event</span><strong>${escapeHTML(ev.name)}</strong></div>
         <div><span>Date</span><strong>${formatDate(ev.date)} · ${formatTime(ev.date)}</strong></div>
-        <div><span>Venue</span><strong>${escapeHTML(ev.city)}</strong></div>
-        <div><span>Tickets</span><strong>${r.tickets}</strong></div>
-        <div><span>Total</span><strong>${r.total ? formatPrice(r.total) : 'Free'}</strong></div>
+        <div><span>Guests</span><strong>${r.tickets}</strong></div>
+        <div><span>Amount</span><strong>${paid ? rupees(r.amount) : 'Complimentary'}</strong></div>
+        ${paid ? `<div><span>UTR</span><strong>${escapeHTML(r.utr)}</strong></div>` : ''}
+        <div><span>Status</span><strong>Under verification</strong></div>
       </div>
       <a href="#my-registrations" class="btn btn-primary btn-block" data-close>View My Bookings</a>`;
     openModal($('#successModal'));
   }
 
-  /* ---------- My Bookings ---------- */
+  /* ---------- My Bookings & tickets ---------- */
+  const eventFor = (r) => getEvent(r.eventId) ||
+    { id: r.eventId, name: r.eventName, date: r.eventDate, city: '', venue: '', image: '' };
+
+  const statusBadge = (s) => `<span class="status-badge ${s}">${ic(STATUS[s].icon)} ${STATUS[s].label}</span>`;
+
   function renderBookings() {
     const list = $('#bookingsList');
-    const mine = myRegistrations();
+    const mine = myRegs.filter((r) => r.status !== 'cancelled');
     $('#bookingCount').textContent = mine.length;
 
     if (!currentUser) {
       list.innerHTML = `
         <div class="empty-state">
-          <div class="empty-icon">🔐</div>
-          <h3>Sign in to see your bookings</h3>
-          <p>Your registrations are linked to your Google account.</p>
-          <a href="#register" class="btn btn-outline">Sign in with Google</a>
+          ${ic('lock')}
+          <h3>Sign in to view your bookings</h3>
+          <p>Your reservations are linked to your Google account.</p>
+          <a href="#register" class="btn btn-outline">Sign in</a>
         </div>`;
       return;
     }
@@ -730,43 +1030,323 @@
     if (!mine.length) {
       list.innerHTML = `
         <div class="empty-state">
-          <div class="empty-icon">🎟️</div>
-          <h3>No bookings yet</h3>
-          <p>Register for an event and it will appear here.</p>
+          ${ic('ticket')}
+          <h3>No reservations yet</h3>
+          <p>Your bookings and tickets will appear here.</p>
           <a href="#events" class="btn btn-outline">Browse events</a>
         </div>`;
       return;
     }
 
     list.innerHTML = mine.map((r, i) => {
-      const ev = getEvent(r.eventId);
-      if (!ev) return '';
+      const ev = eventFor(r);
+      const date = ev.date ? `${formatDate(ev.date)} · ${formatTime(ev.date)}` : '';
       return `
-        <div class="booking" style="animation-delay:${i * 50}ms">
+        <div class="booking" style="animation-delay:${i * 60}ms">
           ${imageHTML(ev)}
           <div>
             <h4>${escapeHTML(ev.name)}</h4>
-            <p>📅 ${formatDate(ev.date)} · ${formatTime(ev.date)} · 📍 ${escapeHTML(ev.city)}</p>
-            <p>👤 ${escapeHTML(r.name)} · ${r.tickets} ticket${r.tickets > 1 ? 's' : ''} · ${r.total ? formatPrice(r.total) : 'Free'}</p>
-            <span class="ticket-id">${r.id}</span>
+            <p>${ic('calendar')} ${date} ${ev.city ? `· ${ic('pin')} ${escapeHTML(ev.city)}` : ''}</p>
+            <p>${ic('user')} ${r.tickets} guest${r.tickets > 1 ? 's' : ''} · ${r.amount ? rupees(r.amount) : 'Complimentary'}${r.utr ? ` · UTR ${escapeHTML(r.utr)}` : ''}</p>
+            <div class="status-line">
+              ${statusBadge(r.status)}
+              ${r.status === 'rejected' && r.rejectReason ? `<span class="reason">${escapeHTML(r.rejectReason)}</span>` : ''}
+            </div>
           </div>
           <div class="booking-actions">
-            <button class="btn btn-outline" data-open="${ev.id}">Details</button>
-            <button class="btn btn-ghost" data-cancel="${r.id}">Cancel</button>
+            ${r.status === 'approved' && r.ticketId ? `<button class="btn btn-primary btn-sm" data-ticket="${r.id}">${ic('ticket')} View ticket</button>` : ''}
+            <button class="btn btn-outline btn-sm" data-open="${escapeHTML(ev.id)}">Details</button>
+            ${r.hasProof ? `<button class="btn btn-outline btn-sm" data-proof="${r.id}">Payment proof</button>` : ''}
+            ${r.status === 'pending' ? `<button class="btn btn-ghost btn-sm" data-cancel="${r.id}">Cancel</button>` : ''}
           </div>
         </div>`;
     }).join('');
   }
 
+  // Tickets exist only after an admin approves (the ticket ID is issued on approval)
+  function showTicket(id) {
+    const r = myRegs.find((x) => x.id === id);
+    if (!r || r.status !== 'approved' || !r.ticketId) { toast('Your ticket is issued once the payment is approved.'); return; }
+    const ev = eventFor(r);
+    $('#ticketBody').innerHTML = `
+      <div class="ticket-card">
+        <div class="tk-top">
+          <div class="tk-brand"><span class="logo-mark" aria-hidden="true">E</span> Eveora</div>
+          <p class="tk-admit">Admit ${r.tickets} · Confirmed</p>
+          <h3 id="ticketTitle">${escapeHTML(ev.name)}</h3>
+          <div class="tk-meta">
+            <div><small>Date</small><strong>${ev.date ? formatDate(ev.date) : ''}</strong></div>
+            <div><small>Time</small><strong>${ev.date ? formatTime(ev.date) : ''}</strong></div>
+            <div><small>Venue</small><strong>${escapeHTML(ev.venue ? `${ev.venue}, ${ev.city}` : ev.city)}</strong></div>
+            <div><small>Guest</small><strong>${escapeHTML(r.name)}</strong></div>
+          </div>
+        </div>
+        <div class="tk-cut"></div>
+        <div class="tk-bottom">
+          <div class="tk-qr" id="ticketQr"></div>
+          <div class="tk-id">
+            <small>Ticket ID</small>
+            <strong>${escapeHTML(r.ticketId)}</strong>
+            <p>Show this ticket at the entrance.</p>
+          </div>
+        </div>
+      </div>
+      <div class="ticket-actions"><button class="btn btn-outline btn-sm" data-copy="${escapeHTML(r.ticketId)}">${ic('copy')} Copy ticket ID</button></div>`;
+    renderQr($('#ticketQr'), `EVEORA|${r.ticketId}|${r.eventId}|${r.tickets}`, 92);
+    openModal($('#ticketModal'));
+  }
+
   function initBookings() {
-    $('#bookingsList').addEventListener('click', (e) => {
+    $('#bookingsList').addEventListener('click', async (e) => {
       const btn = e.target.closest('[data-cancel]');
       if (!btn) return;
-      if (!confirm('Cancel this registration?')) return;
-      registrations = registrations.filter((r) => r.id !== btn.dataset.cancel);
-      store.set(STORAGE_KEY, registrations);
-      refreshAll();
-      toast('Registration cancelled');
+      const r = myRegs.find((x) => x.id === btn.dataset.cancel);
+      if (!r) return;
+      const ok = await askConfirm({
+        title: 'Cancel this reservation?',
+        text: r.amount ? 'It will be withdrawn from review. If you have already paid, please contact the organiser about a refund.' : 'Your reservation will be cancelled.',
+        okLabel: 'Cancel reservation',
+        danger: true
+      });
+      if (ok === false) return;
+      const batch = fb.db.batch();
+      batch.update(fb.db.collection('registrations').doc(r.id), { status: 'cancelled' });
+      if (r.utr) batch.delete(fb.db.collection('utrs').doc(r.utr));
+      try { await batch.commit(); toast('Reservation cancelled.'); }
+      catch (err) { console.error('[Eveora] Cancel failed', err); toast('Could not cancel. Please try again.'); }
+    });
+  }
+
+  /* ---------- Payment proof viewer ---------- */
+  async function showProof(id) {
+    const r = adminRegs.find((x) => x.id === id) || myRegs.find((x) => x.id === id);
+    const body = $('#proofBody');
+    body.innerHTML = '<div class="proof-loading"><span class="spinner"></span> Loading screenshot…</div>';
+    openModal($('#proofModal'));
+    try {
+      const doc = await fb.db.collection('paymentProofs').doc(id).get();
+      const data = doc.exists ? doc.data().image : '';
+      if (!/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(data)) throw new Error('missing');
+      body.innerHTML = `
+        <span class="eyebrow">Payment proof</span>
+        <h3 id="proofTitle">${r ? escapeHTML(r.name) : 'Screenshot'}</h3>
+        <p class="proof-meta">${r ? `${escapeHTML(r.eventName)} · ${rupees(r.amount)} · UTR <strong>${escapeHTML(r.utr)}</strong>` : ''}</p>`;
+      const img = document.createElement('img');
+      img.className = 'proof-img';
+      img.alt = 'Payment screenshot';
+      img.src = data;
+      body.appendChild(img);
+    } catch (e) {
+      body.innerHTML = `<div class="empty-state">${ic('image')}<h3>Screenshot unavailable</h3><p>It could not be loaded.</p></div>`;
+    }
+  }
+
+  /* ---------- Admin: payment verification ---------- */
+  const ADMIN_FILTERS = ['pending', 'approved', 'rejected', 'cancelled', 'all'];
+  const newTicketId = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let id = '';
+    for (let i = 0; i < 6; i++) id += chars[Math.floor(Math.random() * chars.length)];
+    return 'EV-' + id;
+  };
+
+  function reviewActions(r) {
+    if (r.status === 'pending') {
+      return `<button class="btn btn-ghost btn-sm" data-review="reject" data-id="${r.id}">Reject</button>
+              <button class="btn btn-primary btn-sm" data-review="approve" data-id="${r.id}">${ic('check')} Approve &amp; issue ticket</button>`;
+    }
+    if (r.status === 'approved') return `<button class="btn btn-ghost btn-sm" data-review="pending" data-id="${r.id}">Undo approval</button>`;
+    if (r.status === 'rejected') return `<button class="btn btn-outline btn-sm" data-review="pending" data-id="${r.id}">Reopen</button>`;
+    return '';
+  }
+
+  function reviewCardHTML(r, utrCount, i) {
+    const ev = getEvent(r.eventId);
+    const expected = ev ? ev.price * r.tickets : r.amount;
+    const mismatch = ev && expected !== r.amount;
+    const dup = r.utr && utrCount[r.utr] > 1;
+    return `
+      <article class="review-card" data-status="${r.status}" style="animation-delay:${Math.min(i, 8) * 40}ms">
+        <div class="rc-head">
+          <div>
+            <h4>${escapeHTML(r.eventName || (ev && ev.name) || r.eventId)}</h4>
+            <p>${ev ? `${formatDate(ev.date)} · ` : ''}${r.tickets} guest${r.tickets > 1 ? 's' : ''}${ev ? ` · ${seatsLeft(ev)} seats available` : ''}</p>
+          </div>
+          ${statusBadge(r.status)}
+        </div>
+        <div class="rc-grid">
+          <div><small>Guest</small><strong>${escapeHTML(r.name)}</strong></div>
+          <div><small>Email</small><strong>${escapeHTML(r.email)}</strong></div>
+          <div><small>Phone</small><strong>${escapeHTML(r.phone)}</strong></div>
+          <div><small>Amount</small><strong>${r.amount ? rupees(r.amount) : 'Complimentary'}</strong>${mismatch ? `<em class="warn">Expected ${rupees(expected)}</em>` : ''}</div>
+          <div><small>UTR</small>${r.utr ? `<code>${escapeHTML(r.utr)}</code><button class="copy-btn" data-copy="${escapeHTML(r.utr)}" aria-label="Copy UTR">${ic('copy')}</button>` : '<strong>—</strong>'}${dup ? '<em class="warn">Used in more than one booking</em>' : ''}</div>
+          <div><small>Submitted</small><strong>${formatStamp(r.createdAt)}</strong></div>
+        </div>
+        ${r.status === 'rejected' && r.rejectReason ? `<p class="rc-note">Reason: ${escapeHTML(r.rejectReason)}</p>` : ''}
+        ${r.status === 'approved' && r.ticketId ? `<p class="rc-meta">Ticket ${escapeHTML(r.ticketId)} issued</p>` : ''}
+        ${r.reviewedBy ? `<p class="rc-meta">Reviewed by ${escapeHTML(r.reviewedBy)} · ${formatStamp(r.reviewedAt)}</p>` : ''}
+        <div class="rc-actions">
+          ${r.hasProof ? `<button class="btn btn-outline btn-sm" data-proof="${r.id}">${ic('image')} View screenshot</button>` : '<span class="rc-meta">No payment required</span>'}
+          <span class="spacer"></span>
+          ${reviewActions(r)}
+        </div>
+      </article>`;
+  }
+
+  function renderAdmin() {
+    const show = !!(currentUser && roles.admin);
+    $('#admin').classList.toggle('hidden', !show);
+    $('#adminNavLink').classList.toggle('hidden', !show);
+    $('#adminManager').classList.toggle('hidden', !(show && roles.superadmin));
+    if (!show) return;
+
+    const counts = { pending: 0, approved: 0, rejected: 0, cancelled: 0 };
+    let revenue = 0;
+    const utrCount = {};
+    adminRegs.forEach((r) => {
+      counts[r.status] = (counts[r.status] || 0) + 1;
+      if (r.status === 'approved') revenue += r.amount || 0;
+      if (r.utr && r.status !== 'cancelled') utrCount[r.utr] = (utrCount[r.utr] || 0) + 1;
+    });
+    $('#pendingCount').textContent = counts.pending;
+
+    $('#adminStats').innerHTML = `
+      <div class="stat"><strong>${counts.pending}</strong><span>Awaiting review</span></div>
+      <div class="stat"><strong>${counts.approved}</strong><span>Approved</span></div>
+      <div class="stat"><strong>${counts.rejected}</strong><span>Rejected</span></div>
+      <div class="stat"><strong>${rupees(revenue)}</strong><span>Verified revenue</span></div>`;
+
+    $('#adminFilters').innerHTML = ADMIN_FILTERS.map((f) => `
+      <button class="chip ${state.adminFilter === f ? 'active' : ''}" data-filter="${f}">
+        ${f === 'all' ? 'All' : STATUS[f].short}${f === 'all' ? '' : ` · ${counts[f] || 0}`}
+      </button>`).join('');
+
+    const q = state.adminSearch.trim().toLowerCase();
+    const list = adminRegs.filter((r) => (state.adminFilter === 'all' || r.status === state.adminFilter) &&
+      (!q || `${r.name} ${r.email} ${r.phone} ${r.utr} ${r.eventName} ${r.ticketId || ''}`.toLowerCase().includes(q)));
+
+    $('#reviewList').innerHTML = list.length
+      ? list.map((r, i) => reviewCardHTML(r, utrCount, i)).join('')
+      : `<div class="empty-state">${ic('shield')}<h3>All caught up</h3><p>No ${state.adminFilter === 'all' ? '' : STATUS[state.adminFilter].short.toLowerCase() + ' '}registrations${q ? ' match your search' : ''}.</p></div>`;
+
+    renderAdminManager();
+  }
+
+  async function reviewRegistration(id, action) {
+    const r = adminRegs.find((x) => x.id === id);
+    if (!r) return;
+    const ev = getEvent(r.eventId);
+    let reason = '';
+
+    if (action === 'approve' && ev && r.tickets > seatsLeft(ev)) {
+      const ok = await askConfirm({ title: 'Not enough seats', text: `Only ${seatsLeft(ev)} seat(s) remain for ${ev.name}. Approve anyway?`, okLabel: 'Approve anyway' });
+      if (ok === false) return;
+    }
+    if (action === 'reject') {
+      reason = await askConfirm({
+        title: 'Reject this payment?',
+        text: 'Let the guest know what went wrong — they will see this in My Bookings.',
+        okLabel: 'Reject payment',
+        danger: true,
+        input: { placeholder: 'e.g. UTR not found in our account' }
+      });
+      if (reason === false) return;
+    }
+
+    const FV = firebase.firestore.FieldValue;
+    const db = fb.db;
+    const next = action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : 'pending';
+    const statsRef = db.collection('eventStats').doc(r.eventId);
+    const batch = db.batch();
+
+    batch.update(db.collection('registrations').doc(id), {
+      status: next,
+      reviewedBy: currentUser.email,
+      reviewedAt: FV.serverTimestamp(),
+      rejectReason: next === 'rejected' ? reason.slice(0, 200) : FV.delete(),
+      ticketId: next === 'approved' ? newTicketId() : FV.delete()
+    });
+    // Seat counts include approved tickets only
+    if (next === 'approved' && r.status !== 'approved') batch.set(statsRef, { booked: FV.increment(r.tickets) }, { merge: true });
+    if (r.status === 'approved' && next !== 'approved') batch.set(statsRef, { booked: FV.increment(-r.tickets) }, { merge: true });
+    // A rejected UTR is released so the guest can resubmit it; reopening claims it again
+    if (r.utr && next === 'rejected') batch.delete(db.collection('utrs').doc(r.utr));
+    if (r.utr && r.status === 'rejected' && next === 'pending') batch.set(db.collection('utrs').doc(r.utr), { uid: r.uid, regId: r.id, createdAt: FV.serverTimestamp() });
+
+    try {
+      await batch.commit();
+      toast(next === 'approved' ? `Approved — ticket issued to ${firstName(r.name)}.` : next === 'rejected' ? 'Payment rejected.' : 'Moved back to pending.');
+    } catch (err) {
+      console.error('[Eveora] Review failed', err);
+      toast(r.status === 'rejected' && err.code === 'permission-denied'
+        ? 'That UTR is now attached to another booking.'
+        : 'Could not update this booking. Please try again.');
+    }
+  }
+
+  /* ---------- Admin: team management (superadmin) ---------- */
+  function renderAdminManager() {
+    if (!roles.superadmin) return;
+    const row = (email, sub, action) => `
+      <li><span class="avatar">${escapeHTML(email.charAt(0).toUpperCase())}</span>
+        <div><strong>${escapeHTML(email)}</strong><small>${sub}</small></div>${action}</li>`;
+    $('#adminList').innerHTML =
+      row(SUPERADMIN, 'Full access · manages the admin team', '<span class="role-badge">Superadmin</span>') +
+      adminList.map((a) => row(a.email,
+        `Admin · added by ${escapeHTML(a.addedBy || '')}${tsDate(a.addedAt) ? ' on ' + tsDate(a.addedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : ''}`,
+        `<button class="btn btn-ghost btn-sm" data-remove-admin="${escapeHTML(a.email)}">Remove</button>`)).join('');
+  }
+
+  function initAdmin() {
+    $('#adminFilters').addEventListener('click', (e) => {
+      const chip = e.target.closest('[data-filter]');
+      if (!chip) return;
+      state.adminFilter = chip.dataset.filter;
+      renderAdmin();
+    });
+
+    let debounce;
+    $('#adminSearch').addEventListener('input', (e) => {
+      clearTimeout(debounce);
+      debounce = setTimeout(() => { state.adminSearch = e.target.value; renderAdmin(); }, 200);
+    });
+
+    $('#reviewList').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-review]');
+      if (btn) reviewRegistration(btn.dataset.id, btn.dataset.review);
+    });
+
+    $('#addAdminForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const input = $('#newAdminEmail');
+      const err = $('#addAdminError');
+      const email = input.value.trim().toLowerCase();
+      err.textContent = '';
+      if (!/^[^\s@/]+@[^\s@/]+\.[a-z]{2,}$/.test(email)) { err.textContent = 'Please enter a valid email address.'; return; }
+      if (email === SUPERADMIN) { err.textContent = 'This account is already the superadmin.'; return; }
+      if (adminList.some((a) => a.email === email)) { err.textContent = 'This person is already an admin.'; return; }
+      try {
+        await fb.db.collection('admins').doc(email).set({
+          email,
+          addedBy: currentUser.email,
+          addedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        input.value = '';
+        toast(`${email} is now an admin.`);
+      } catch (ex) {
+        console.error('[Eveora] Add admin failed', ex);
+        err.textContent = 'Could not add this admin. Please try again.';
+      }
+    });
+
+    $('#adminList').addEventListener('click', async (e) => {
+      const btn = e.target.closest('[data-remove-admin]');
+      if (!btn) return;
+      const email = btn.dataset.removeAdmin;
+      const ok = await askConfirm({ title: 'Remove admin?', text: `${email} will no longer be able to verify payments.`, okLabel: 'Remove', danger: true });
+      if (ok === false) return;
+      try { await fb.db.collection('admins').doc(email).delete(); toast(`${email} was removed.`); }
+      catch (ex) { console.error('[Eveora] Remove admin failed', ex); toast('Could not remove this admin.'); }
     });
   }
 
@@ -775,31 +1355,26 @@
     const navbar = $('#navbar');
     const topBtn = $('#backToTop');
     const onScroll = () => {
-      navbar.classList.toggle('scrolled', window.scrollY > 20);
-      topBtn.classList.toggle('show', window.scrollY > 600);
+      navbar.classList.toggle('scrolled', window.scrollY > 30);
+      topBtn.classList.toggle('show', window.scrollY > 700);
     };
     window.addEventListener('scroll', onScroll, { passive: true });
     onScroll();
     topBtn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
 
-    // Reveal-on-scroll animations
     const io = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('visible');
-          io.unobserve(entry.target);
-        }
+        if (entry.isIntersecting) { entry.target.classList.add('visible'); io.unobserve(entry.target); }
       });
     }, { threshold: 0.12 });
     $$('.reveal').forEach((el) => io.observe(el));
 
-    // Animated counters in hero
     $$('[data-count]').forEach((el) => {
       const target = Number(el.dataset.count);
       const suffix = el.dataset.suffix || '';
       const start = performance.now();
       const tick = (now) => {
-        const p = Math.min((now - start) / 1500, 1);
+        const p = Math.min((now - start) / 1600, 1);
         const eased = 1 - Math.pow(1 - p, 3);
         el.textContent = Math.round(target * eased).toLocaleString('en-IN') + (p === 1 ? suffix : '');
         if (p < 1) requestAnimationFrame(tick);
@@ -815,6 +1390,7 @@
     renderBookings();
     populateEventSelect();
     updateFormSummary();
+    renderAdmin();
   }
 
   function init() {
@@ -822,6 +1398,7 @@
     $('[data-count="12"]').dataset.count = EVENTS.filter((e) => !isPast(e)).length;
     $('[data-count="8"]').dataset.count = new Set(EVENTS.map((e) => e.city)).size;
 
+    const ready = initFirebase();
     initTheme();
     initAuth();
     initNavbar();
@@ -831,9 +1408,18 @@
     initFilters();
     initModals();
     initForm();
+    initProofUpload();
     initBookings();
+    initAdmin();
     initScrollEffects();
     setInterval(updateCountdowns, 1000);
+
+    if (ready) {
+      listenStats();
+      fb.auth.onAuthStateChanged(onAuthChanged);
+    } else {
+      console.warn('[Eveora] Firebase is not configured – browsing only.');
+    }
   }
 
   document.addEventListener('DOMContentLoaded', init);

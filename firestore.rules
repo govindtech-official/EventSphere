@@ -1,0 +1,120 @@
+rules_version = '2';
+
+// Eveora – Cloud Firestore security rules
+// Roles: the superadmin (email below) adds/removes admins; admins verify
+// payments and issue tickets; attendees only see their own bookings.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    function myEmail() {
+      return request.auth.token.email.lower();
+    }
+    function isSuperAdmin() {
+      return signedIn() && myEmail() == 'contactgovindtech@gmail.com';
+    }
+    function isAdmin() {
+      return isSuperAdmin()
+        || (signedIn() && exists(/databases/$(database)/documents/admins/$(myEmail())));
+    }
+    function regAfter(regId) {
+      return getAfter(/databases/$(database)/documents/registrations/$(regId)).data;
+    }
+
+    // ---------- Admin roles (managed by the superadmin) ----------
+    match /admins/{email} {
+      allow read: if isAdmin() || (signedIn() && myEmail() == email);
+      allow create: if isSuperAdmin()
+        && email == email.lower()
+        && email != 'contactgovindtech@gmail.com'
+        && request.resource.data.keys().hasOnly(['email', 'addedBy', 'addedAt'])
+        && request.resource.data.email == email
+        && request.resource.data.addedBy == myEmail()
+        && request.resource.data.addedAt == request.time;
+      allow delete: if isSuperAdmin();
+      allow update: if false;
+    }
+
+    // ---------- Registrations ----------
+    match /registrations/{regId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+
+      // Attendees create pending bookings; paid ones must include a UTR and screenshot.
+      // No ticket ID on create: tickets are issued only when an admin approves.
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['uid', 'name', 'email', 'phone', 'eventId', 'eventName',
+             'eventDate', 'tickets', 'price', 'amount', 'utr', 'hasProof', 'status', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.email == myEmail()
+        && request.resource.data.status == 'pending'
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.name is string && request.resource.data.name.size() <= 80
+        && request.resource.data.phone is string && request.resource.data.phone.size() <= 14
+        && request.resource.data.eventId is string && request.resource.data.eventId.size() <= 20
+        && request.resource.data.tickets is int
+        && request.resource.data.tickets >= 1 && request.resource.data.tickets <= 5
+        && request.resource.data.amount is int && request.resource.data.amount >= 0
+        && request.resource.data.utr is string
+        && (request.resource.data.amount == 0
+            || (request.resource.data.hasProof == true
+                && request.resource.data.utr.matches('^[A-Z0-9]{12,22}$')
+                && existsAfter(/databases/$(database)/documents/utrs/$(request.resource.data.utr))
+                && existsAfter(/databases/$(database)/documents/paymentProofs/$(regId))));
+
+      // Admins review and issue tickets; attendees may only cancel while pending
+      allow update: if (isAdmin()
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['status', 'reviewedBy', 'reviewedAt', 'rejectReason', 'ticketId'])
+          && request.resource.data.status in ['pending', 'approved', 'rejected']
+          && request.resource.data.reviewedBy == myEmail()
+          && (request.resource.data.status != 'approved' || request.resource.data.ticketId is string))
+        || (signedIn()
+          && resource.data.uid == request.auth.uid
+          && resource.data.status == 'pending'
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+          && request.resource.data.status == 'cancelled');
+
+      allow delete: if false;
+    }
+
+    // ---------- Payment screenshots (kept apart from the booking list) ----------
+    match /paymentProofs/{regId} {
+      allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow create: if signedIn()
+        && request.resource.data.keys().hasOnly(['uid', 'regId', 'image', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.regId == regId
+        && request.resource.data.image is string
+        && request.resource.data.image.size() < 900000
+        && regAfter(regId).uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // ---------- UTR register: each UTR backs only one active booking ----------
+    match /utrs/{utr} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        || (signedIn()
+          && request.resource.data.keys().hasOnly(['uid', 'regId', 'createdAt'])
+          && request.resource.data.uid == request.auth.uid
+          && regAfter(request.resource.data.regId).uid == request.auth.uid
+          && regAfter(request.resource.data.regId).utr == utr);
+      allow delete: if isAdmin()
+        || (signedIn()
+          && resource.data.uid == request.auth.uid
+          && regAfter(resource.data.regId).status == 'cancelled');
+      allow update: if false;
+    }
+
+    // ---------- Approved seat counts (public) ----------
+    match /eventStats/{eventId} {
+      allow read: if true;
+      allow write: if isAdmin()
+        && request.resource.data.keys().hasOnly(['booked'])
+        && request.resource.data.booked is int
+        && request.resource.data.booked >= 0;
+    }
+  }
+}

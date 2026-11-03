@@ -1,6 +1,8 @@
-# 🎉 EventSphere – Responsive Event Management Website
+# Eveora — *Where moments come alive*
 
-EventSphere is a modern, fully responsive event management website. You can explore upcoming events, see the full details of each one, and register with a validated form. It's built with **HTML5, CSS3 and vanilla JavaScript**, with no frameworks or build step.
+Eveora is a premium, fully responsive event reservation website. Guests can explore curated events, see every detail and reserve a place. Paid bookings go through **manual UPI payment verification**, and a ticket is issued only after an admin approves the payment.
+
+It's built with **HTML5, CSS3 and vanilla JavaScript**, uses **Firebase** (Google sign-in + Cloud Firestore) as the backend, and has no build step.
 
 > **K Explore – Web Designing Task:** Design and Develop a Responsive Event Management Website
 
@@ -14,114 +16,120 @@ EventSphere is a modern, fully responsive event management website. You can expl
 ### Core requirements
 | Feature | Description |
 |---|---|
-| **Hero section** | Animated gradient background, headline, a search bar that jumps to results, animated stats, and a "Next up" card with a live countdown |
+| **Hero section** | Full-bleed photo with a serif headline, a search bar, animated stats and a "Next on the calendar" card with a live countdown |
 | **Featured events** | A horizontal slider (scroll-snap with arrow buttons) of hand-picked events |
-| **Event cards** | Each card shows the image, name, date, time, venue, short description, price and how many seats are left |
-| **Search** | Live search by name, venue, city, category or description (debounced) |
-| **Category filter** | Chips for Music, Technology, Workshop, Sports, Food, Art and Business |
-| **Sorting** | Sort by soonest date, price (low to high or high to low) or name |
-| **Event details** | A modal with full info, highlights, organizer, seats left and a **Register Now** button |
-| **Registration form** | Name, email, phone, event, number of tickets and a terms checkbox, with a live total price |
-| **JS form validation** | Inline error messages, invalid fields highlighted with a shake animation, and focus moved to the first invalid field |
-| **Confirmation message** | A success modal with a generated **Ticket ID** and a booking summary |
-| **Responsive design** | Layouts for mobile, tablet and desktop, with a hamburger menu and a bottom-sheet modal on phones |
+| **Event cards** | Image, name, date, time, venue, description, price and seats available |
+| **Search, filter, sort** | Live search, category chips, and sorting by date, price or name |
+| **Event details** | A modal with full info, highlights, host, seats available, a countdown and a **Reserve now** button |
+| **Reservation form** | Name, email, phone, event, tickets, terms and a live total, with JavaScript validation and inline errors |
+| **Confirmation** | A confirmation modal with a booking summary after each submission |
+| **Responsive design** | Mobile, tablet and desktop layouts, a hamburger menu and bottom-sheet modals on phones |
+
+### 💳 Manual payment verification
+1. The guest picks a paid event. The form shows the **amount due**, a **UPI QR code**, the UPI ID and an "Open UPI app" link.
+2. After paying, the guest enters the **UTR / UPI reference number** and uploads a **payment screenshot**.
+3. The booking is saved as **Under verification**. No ticket exists yet.
+4. An admin compares the UTR and screenshot with the payment app, then **approves** or **rejects** it with a reason.
+5. On approval the system issues a **ticket ID**. The guest can then open their **ticket** (with a QR code) from **My Bookings**. Status changes appear live.
+
+Safeguards:
+- Each UTR can back only one active booking, enforced in the database.
+- The admin view flags amounts that don't match the event price and UTRs that were reused.
+- Seat counts include only approved tickets.
+
+> Until a real UPI ID is set in `js/config.js`, the payment step runs in **demo mode** and tells visitors not to send money.
+
+### 👑 Roles
+| Role | Can do |
+|---|---|
+| **Superadmin** (`contactgovindtech@gmail.com`) | Everything an admin can, plus **make other people admins** or remove them |
+| **Admin** | View all bookings and payment screenshots, approve or reject payments, issue tickets |
+| **Guest** | Reserve, see their own bookings and payment proof, cancel while pending, view tickets once approved |
+
+These rules are enforced by [`firestore.rules`](firestore.rules) on the server, not just hidden in the UI.
 
 ### 🔑 Login with Google
-- **Google Sign-In is the only login method.** There are no passwords or other providers. It uses [Google Identity Services](https://developers.google.com/identity/gsi/web): the official button plus One Tap.
-- You have to sign in to register. Your **name and email are filled in from your Google account**, and the email can't be edited.
-- **My Bookings** only shows the registrations for the signed-in account. A profile menu in the navbar shows your avatar and has **Sign out**.
+Google Sign-In is the only login method (official button + One Tap), linked to Firebase Authentication. Your name and email are filled in from your Google account.
 
-### 🏆 Bonus challenges (all implemented)
-- 🌙 **Dark / light mode**: the toggle is saved in Local Storage, follows the OS preference on first visit, and doesn't flash on load
-- ⏳ **Event countdown timers**: live days, hours, minutes and seconds in the hero card and in every event modal
-- 🎞️ **Animations**: scroll-reveal sections, floating blobs, card hover lifts, modal pop-in, animated counters and a loading spinner. Motion is turned off when the user prefers reduced motion
-- 💾 **Local Storage registration management**: bookings are saved and listed under **My Bookings**, can be cancelled, and update the seat counts across the site. The same email can't register twice for one event
+### 🏆 Bonus challenges
+- 🌙 **Dark / light mode:** dark by default, remembered across visits, with no flash on load
+- ⏳ **Countdown timers** in the hero card and every event modal
+- 🎞️ **Animations:** scroll reveals, a slow hero zoom, card lifts, modal transitions and animated counters. Motion is turned off for users who prefer reduced motion
+- 💾 **Local Storage** for the theme preference. Bookings are stored in Firestore so admins can verify them from any device
 
 ### Validation rules
 | Field | Rule |
 |---|---|
-| Full name | Required, at least 3 characters, letters, spaces, dots and hyphens only |
-| Email | Required, valid format (`name@domain.tld`), unique per event |
-| Phone | Required, valid 10-digit Indian mobile number starting with 6–9 (`+91`, spaces and dashes allowed) |
-| Event | Required, and must be upcoming and not sold out |
-| Tickets | 1–5, and no more than the seats left |
+| Full name | Required, at least 3 letters (any language) |
+| Email | From the Google account (read-only) |
+| Phone | Valid 10-digit Indian mobile number starting with 6–9 |
+| Event | Upcoming, not fully booked, and not already booked by you |
+| Tickets | 1–5, and no more than the seats available |
+| UTR | Paid events only: 12–22 letters or digits, and not already used |
+| Screenshot | Paid events only: JPG, PNG or WebP up to 10 MB, compressed in the browser |
 | Terms | Must be accepted |
 
 ---
 
 ## 🛠️ Tech Stack
-- **HTML5**: semantic markup (`header`, `nav`, `main`, `section`, `article`, `footer`) with ARIA labels and roles
-- **CSS3**: custom properties (design tokens), Flexbox, Grid, `clamp()`, scroll-snap, `backdrop-filter`, keyframe animations and media queries
-- **JavaScript (ES6+)**: modules wrapped in an IIFE, event delegation, `IntersectionObserver`, `localStorage` and template literals
-- **Git & GitHub** for version control
+- **HTML5**: semantic markup and an inline SVG icon set
+- **CSS3**: design tokens for both themes, Grid, Flexbox, `clamp()`, scroll-snap, `backdrop-filter`, keyframe animations
+- **JavaScript (ES6+)**: an IIFE, event delegation, `IntersectionObserver`, and Canvas image compression
+- **Firebase**: Authentication (Google) and Cloud Firestore with security rules, all on the free Spark plan
+- **Libraries**: [qrcodejs](https://github.com/davidshimjs/qrcodejs) for the UPI and ticket QR codes
+- **Git & GitHub** for version control, **GitHub Pages** for hosting
 
 ## 📁 Project Structure
 ```
 EventSphere/
-├── index.html        # Page structure: navbar, hero, featured, events, form, bookings, modals
-├── privacy.html      # Privacy policy (linked from the Google consent screen)
+├── index.html        # Navbar, hero, featured, events, reservation + payment, bookings, admin, modals
+├── privacy.html      # Privacy policy
 ├── terms.html        # Terms of service
-├── css/
-│   └── style.css     # All styles: themes, components, animations, responsive breakpoints
+├── firestore.rules   # Database security rules (roles, payment checks, UTR uniqueness)
+├── firebase.json     # Firebase CLI / emulator config
+├── css/style.css     # Luxury theme: tokens, components, animations, breakpoints
 ├── js/
-│   ├── config.js     # Google OAuth Client ID
-│   ├── data.js       # Event dataset (12 events) and category icons
-│   └── app.js        # Rendering, search/filter/sort, modals, countdowns, validation, storage
+│   ├── config.js     # Google Client ID, Firebase config, superadmin email, UPI details
+│   ├── data.js       # Event dataset (12 events)
+│   └── app.js        # Rendering, auth, payment, validation, bookings, tickets, admin
 └── README.md
 ```
 
-## ⚙️ How it works
-1. **Data:** events are stored as an array of objects in `js/data.js`. To add an event, add an object to the array and the site updates automatically.
-2. **Rendering:** `app.js` builds the cards from the data with template literals. Search, category and sort are kept in one `state` object, and every change re-renders the grid.
-3. **Details modal:** one delegated click listener opens the modal for any card. You can close it with **Esc**, the × button or by clicking the backdrop, and focus is handled for keyboard users.
-4. **Validation:** each field has its own validator function that returns an error message. Fields are checked on blur, re-checked live after an error, and all checked again on submit.
-5. **Storage:** a confirmed registration is saved to `localStorage` under the key `es-registrations`. Seats left are worked out as `total seats − booked tickets`, so cancelling a booking frees the seats.
-6. **Theme:** the `data-theme` attribute on `<html>` switches the CSS variables. A small inline script in `<head>` applies the saved theme before the page is drawn.
+## 🗄️ Data model (Cloud Firestore)
+| Collection | Contents | Who can read |
+|---|---|---|
+| `registrations` | Guest, event, tickets, amount, UTR, status, ticket ID (after approval) | The guest who made it, and admins |
+| `paymentProofs` | Compressed screenshot (one document per booking) | The guest who made it, and admins |
+| `utrs` | One document per UTR, so a UTR can't be reused | Admins |
+| `admins` | Emails the superadmin has made admins | Admins (and each person their own entry) |
+| `eventStats` | Approved seats per event | Everyone |
 
-## 🔐 Google Sign-In setup (required for login)
-The live site is already configured. Follow these steps only if you fork the project and need your own Client ID.
+Screenshots are stored in Firestore as compressed images (usually under 400 KB), so the project needs no paid Firebase Storage plan.
 
-1. Open the [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials) and create or select a project.
-2. Set up the **OAuth consent screen**: choose External and add the app name and your email.
-3. Click **Create credentials → OAuth client ID** and choose the **Web application** type.
-4. Under **Authorized JavaScript origins**, add every URL the site runs on (no paths), for example:
-   - `http://localhost`
-   - `http://localhost:5173`
-   - `https://<username>.github.io`
-5. Copy the Client ID into `js/config.js`:
-   ```js
-   window.ES_CONFIG = { GOOGLE_CLIENT_ID: '1234-abc.apps.googleusercontent.com' };
-   ```
-> Google Sign-In does **not** work from `file://`. Run the site from a local server (see below) or from your deployed URL.
-> The Client ID is public by design, so it's safe to commit. This is a front-end-only demo: the ID token is decoded in the browser, and the sign-in state is kept in Local Storage.
+## ⚙️ Setup
+1. **Google Sign-In:** create an OAuth **Web** client and add every site URL under *Authorized JavaScript origins*. Put the Client ID in `js/config.js`.
+2. **Firebase:** add Firebase to the same Google Cloud project and register a Web app. Copy its config into `js/config.js` → `FIREBASE`.
+3. **Authentication:** enable the **Google** provider, add the OAuth Client ID under *Safelist client IDs*, and add your site's domain under *Authorized domains*.
+4. **Firestore:** create the database in production mode, then paste [`firestore.rules`](firestore.rules) into the **Rules** tab and click **Publish**.
+5. **Payments:** set `PAYMENT.UPI_ID` in `js/config.js` to the UPI ID that should receive payments.
+6. **Superadmin:** change the email in both `js/config.js` and `firestore.rules` if needed.
 
-## 🚀 Run locally
-No installation needed. Just open `index.html` in a browser, or run a local server:
+## 🧪 Run locally with the Firebase emulators
+Use this to try every role without touching real data. It needs Node.js and Java 11 or newer.
 ```bash
-npx http-server -p 5173 .
+npx firebase-tools emulators:start --project demo-eveora
 ```
-Then open http://localhost:5173.
-
-## 🌐 Deployment
-**GitHub Pages**
-1. Push the project to a GitHub repository.
-2. Go to **Settings → Pages**, set the source to the `main` branch and the `/ (root)` folder, then save.
-3. Your site will be live at `https://<username>.github.io/<repo-name>/`.
-
-**Netlify / Vercel:** import the GitHub repo and deploy. There's no build command, and the publish directory is the project root.
+```bash
+npx http-server -p 5173 -c-1 .
+```
+Then open http://localhost:5173/?emulator and sign in with any test account from the emulator's sign-in popup.
 
 ## 📱 Responsive breakpoints
 | Width | Layout |
 |---|---|
-| > 1024px | Desktop: 3 featured cards per view, two-column hero and form |
-| 600–1024px | Tablet: 2 featured cards, hamburger menu below 900px, stacked hero and form |
-| < 600px | Mobile: swipeable featured cards, single-column form, bottom-sheet modals |
-
-## 🔮 Future improvements
-- A backend (Node/Express or Firebase) with real email confirmations
-- An admin panel to create and manage events
-- Payment gateway integration
-- A calendar (.ics) export for booked events
+| > 1024px | Three featured cards per view, two-column hero and reservation |
+| 600–1024px | Two featured cards, hamburger menu below 960px, stacked layout |
+| < 600px | Swipeable cards, single-column forms, bottom-sheet modals |
 
 ---
-Made with ❤️ for **K Explore – Web Designing**. Event images are from [Unsplash](https://unsplash.com).
+Crafted for **K Explore – Web Designing**. Event images are from [Unsplash](https://unsplash.com).

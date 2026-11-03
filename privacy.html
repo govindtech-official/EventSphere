@@ -1,19 +1,19 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="EventSphere privacy policy – what data the site uses and where it is stored.">
-  <title>Privacy Policy – EventSphere</title>
+  <meta name="description" content="Eveora privacy policy – what information we use and how it is stored.">
+  <title>Privacy Policy – Eveora</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/style.css">
   <script>
     (function () {
       try {
-        var t = localStorage.getItem('es-theme') ||
-          (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        var t = localStorage.getItem('eveora-theme') ||
+          (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
         document.documentElement.setAttribute('data-theme', t);
       } catch (e) {}
     })();
@@ -22,10 +22,10 @@
 <body>
   <header class="navbar scrolled">
     <div class="container nav-inner">
-      <a href="./" class="logo" aria-label="EventSphere home">
-        <span class="logo-icon">◉</span><span class="logo-text">Event<span>Sphere</span></span>
+      <a href="./" class="logo" aria-label="Eveora home">
+        <span class="logo-mark" aria-hidden="true">E</span><span class="logo-text">Eveora</span>
       </a>
-      <a href="./" class="btn btn-outline">← Back to events</a>
+      <a href="./" class="btn btn-outline btn-sm">Back to events</a>
     </div>
   </header>
 
@@ -34,50 +34,53 @@
     <h1>Privacy Policy</h1>
     <p class="updated">Last updated: 3 November 2026</p>
 
-    <p>EventSphere is a student web-design project that lets you browse sample events and register for them.
-      This policy explains what information the website uses and where it is kept.</p>
+    <p>Eveora (“we”) is a student web-design project for browsing and reserving events. This policy explains what
+      information the website uses, why, and who can see it.</p>
 
-    <h2>1. Information we use</h2>
+    <h2>1. Information we collect</h2>
     <ul>
-      <li><strong>Google account details:</strong> when you choose <em>Sign in with Google</em>, Google shares your
-        name, email address and profile picture with the site. We only request these basic profile details.</li>
-      <li><strong>Registration details:</strong> the phone number, event and number of tickets you enter in the
-        registration form.</li>
-      <li><strong>Preferences:</strong> your light/dark theme choice.</li>
+      <li><strong>Google account details:</strong> when you sign in with Google we receive your name, email address
+        and profile picture. We only request these basic profile details.</li>
+      <li><strong>Reservation details:</strong> your phone number, the event, the number of tickets and the amount.</li>
+      <li><strong>Payment proof:</strong> the UTR / UPI reference number and the payment screenshot you upload.
+        We never ask for card numbers, UPI PINs or bank passwords.</li>
+      <li><strong>Preferences:</strong> your light/dark theme choice, kept only in your browser.</li>
     </ul>
 
-    <h2>2. Where your information is stored</h2>
-    <p>Everything is saved only in your own browser using <strong>Local Storage</strong>. EventSphere has no server
-      or database, and we do not send, sell or share your information with anyone.</p>
+    <h2>2. How we use it</h2>
+    <p>Only to manage your reservation: to verify your payment, issue your ticket, show your booking status and
+      contact you about your booking if needed.</p>
 
-    <h2>3. Third-party services</h2>
-    <p>The website loads a few resources from other services, which may receive standard technical information
-      (such as your IP address and browser type) when your browser requests them:</p>
+    <h2>3. Where it is stored and who can see it</h2>
+    <p>Reservations and payment proofs are stored in <strong>Google Firebase (Cloud Firestore)</strong>. Security rules
+      ensure that you can see only your own bookings. Eveora's administrators can see all reservations and payment
+      screenshots in order to verify payments. We do not sell or share your information with anyone else.</p>
+
+    <h2>4. Third-party services</h2>
     <ul>
-      <li><strong>Google Identity Services</strong> – handles Sign in with Google
+      <li><strong>Google Identity Services &amp; Firebase</strong> – sign-in and data storage
         (<a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google Privacy Policy</a>).</li>
-      <li><strong>Google Fonts</strong> – provides the Poppins font.</li>
-      <li><strong>Unsplash</strong> – provides the event images.</li>
-      <li><strong>GitHub Pages</strong> – hosts the website.</li>
+      <li><strong>Google Fonts</strong>, <strong>Unsplash</strong> (images), <strong>cdnjs</strong> (QR code library)
+        and <strong>GitHub Pages</strong> (hosting) may receive standard technical information such as your IP address
+        when your browser loads their resources.</li>
     </ul>
 
-    <h2>4. Cookies</h2>
-    <p>EventSphere does not set its own cookies. Google may set cookies on its own domains to keep you signed in to
-      your Google account.</p>
+    <h2>5. Cookies</h2>
+    <p>Eveora does not set advertising or tracking cookies. Google and Firebase use browser storage to keep you signed in.</p>
 
-    <h2>5. Your choices</h2>
+    <h2>6. Your choices</h2>
     <ul>
       <li>Sign out at any time from the profile menu.</li>
-      <li>Cancel any booking from <em>My Bookings</em>.</li>
-      <li>Delete all data by clearing this site's data in your browser settings.</li>
-      <li>Remove EventSphere's access to your Google account at
+      <li>Cancel a reservation from <em>My Bookings</em> while it is under verification.</li>
+      <li>Ask us to delete your reservations and payment proofs by opening an issue on the GitHub repository below.</li>
+      <li>Remove Eveora's access to your Google account at
         <a href="https://myaccount.google.com/connections" target="_blank" rel="noopener">myaccount.google.com/connections</a>.</li>
     </ul>
 
-    <h2>6. Children</h2>
-    <p>EventSphere is not directed at children under 13.</p>
+    <h2>7. Children</h2>
+    <p>Eveora is not directed at children under 13.</p>
 
-    <h2>7. Changes and contact</h2>
+    <h2>8. Changes and contact</h2>
     <p>We may update this policy and will change the date above when we do. Questions? Open an issue on the
       <a href="https://github.com/govindtech-official/EventSphere/issues" target="_blank" rel="noopener">GitHub repository</a>.</p>
 
@@ -86,7 +89,7 @@
 
   <footer class="footer">
     <div class="container">
-      <p class="copy">© 2026 EventSphere · Built with HTML, CSS &amp; JavaScript</p>
+      <p class="copy">© 2026 Eveora · Where moments come alive.</p>
     </div>
   </footer>
 </body>
